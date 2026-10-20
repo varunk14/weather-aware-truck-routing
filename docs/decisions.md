@@ -144,3 +144,10 @@ shown by colour alone: every level is also named.
 
 Each location on the heatmap shows its actual risk level, rather than a density blend that would
 overstate risk where samples cluster.
+
+### 29. Built for phones as well as desktops
+
+Every screen works on phones from 360 px wide as well as on tablets and desktops: no horizontal
+scrolling, touch-sized controls, inputs large enough to avoid zoom on focus, and respect for the
+notch and home-indicator areas. On phones the header stays at the top and the map sits above the
+panel. The end-to-end tests run on a desktop and a mobile device profile.
