@@ -6,8 +6,9 @@ Weather-aware truck route planner. Clearway compares three routes between two pl
 the weather the truck will meet at each checkpoint at its estimated arrival time, classifies the
 risk from wind, rain, snow and load weight, and recommends the safest route.
 
-> **Status:** project foundation. The API, the web app shell, tooling and CI are in place;
-> routing, weather and risk features are added in the following milestones.
+> **Status:** in development. In place: the API and web app shell, tooling, CI, and the risk
+> engine (thresholds, load rules, route scoring and ranking). Routing, weather and the trip
+> planner interface are added in the following milestones.
 
 ## Tech stack
 
@@ -51,6 +52,17 @@ Open http://localhost:5173. The web app proxies `/api` to the API on http://127.
 | `make check`   | Run every check that CI runs                       |
 | `make build`   | Build the web app for production                   |
 
+## Risk rules
+
+The risk engine classifies a checkpoint from its wind, rain, snow and the load weight. Try it:
+
+```bash
+cd backend
+uv run python manage.py assess_risk --wind 40 --rain 0.3 --load 42000
+```
+
+How levels, route scores and the ranking work is described in [docs/risk-model.md](docs/risk-model.md).
+
 ## API
 
 | Method | Path          | Description                                  |
@@ -62,7 +74,8 @@ Open http://localhost:5173. The web app proxies `/api` to the API on http://127.
 ```
 backend/
   config/            Django project: settings (base, dev, prod, test), URLs, WSGI
-  routing/           API application: views and URL routes
+  routing/           API application: views, URL routes, management commands
+  routing/risk/      Risk engine: thresholds, load rules, route scoring and ranking
   tests/             pytest suite
 frontend/
   src/app/           Application shell and layout
@@ -74,10 +87,12 @@ frontend/
   e2e/               Playwright end-to-end tests
 docs/
   decisions.md       How the specification was interpreted, and why
+  risk-model.md      Risk levels, route scoring and ranking, with examples
 ```
 
 ## Documentation
 
+- [Risk model](docs/risk-model.md): how weather and load become risk levels, and how routes are ranked.
 - [Design decisions](docs/decisions.md): interpretation of the specification and technical choices.
 
 ## License

@@ -85,67 +85,77 @@ specification.
 
 There are no accounts or saved trips. Third-party responses are cached in memory only.
 
+### 17. Small differences do not decide the ranking
+
+Miles are compared to the nearest 0.1 mile and average risk to three decimals, so floating-point
+noise never makes one route rank above another that is equal in practice.
+
+### 18. Warn when every route crosses No Travel conditions
+
+If even the best route has No Travel miles, the recommendation says so and suggests a later
+departure instead of presenting that route as safe.
+
 ## Technical choices
 
-### 17. TomTom for routing and geocoding
+### 19. TomTom for routing and geocoding
 
 TomTom's truck travel mode takes the vehicle weight into account, returns up to five alternative
 routes, and the same account covers geocoding and address suggestions.
 
-### 18. Always three routes
+### 20. Always three routes
 
 TomTom may return fewer alternatives than requested when no sensible ones exist. In that case
 additional routes are requested through a via point offset from the main route.
 
-### 19. Open-Meteo for weather
+### 21. Open-Meteo for weather
 
 Free, no API key, hourly forecasts in mph and inches, and many locations in one request.
 
-### 20. Third-party calls go through the API
+### 22. Third-party calls go through the API
 
 The browser only talks to Clearway's API, so the TomTom key never reaches the client.
 
-### 21. MapLibre GL with OpenFreeMap
+### 23. MapLibre GL with OpenFreeMap
 
 WebGL rendering keeps panning, zooming and the heatmap smooth; OpenFreeMap provides vector tiles
 without a key.
 
-### 22. Heatmap frames load together
+### 24. Heatmap frames load together
 
 All 0 to 48 hour frames arrive in one response, so moving the slider never waits on the network.
 
-### 23. Hosting
+### 25. Hosting
 
 The web app is served as a static site and the API as a separate web service. An uptime monitor
 calls the health endpoint so the API stays responsive.
 
-### 24. Django 5.2 LTS without a database
+### 26. Django 5.2 LTS without a database
 
 Long-term support release; all dependencies support it. The API is stateless, so no database is
 configured.
 
 ## Interface
 
-### 25. Product name
+### 27. Product name
 
 The app is called Clearway: finding the clear road.
 
-### 26. Visual design
+### 28. Visual design
 
 Light, warm surfaces with navy text and a teal accent, set in DM Sans. Green, yellow, orange, red
 and purple are reserved for risk levels and never used as interface colours.
 
-### 27. One risk scale everywhere
+### 29. One risk scale everywhere
 
 Checkpoint markers, route bars, labels and the heatmap use the same five colours. Risk is never
 shown by colour alone: every level is also named.
 
-### 28. The heatmap shows true levels
+### 30. The heatmap shows true levels
 
 Each location on the heatmap shows its actual risk level, rather than a density blend that would
 overstate risk where samples cluster.
 
-### 29. Built for phones as well as desktops
+### 31. Built for phones as well as desktops
 
 Every screen works on phones from 360 px wide as well as on tablets and desktops: no horizontal
 scrolling, touch-sized controls, inputs large enough to avoid zoom on focus, and respect for the
