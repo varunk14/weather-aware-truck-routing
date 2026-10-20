@@ -13,7 +13,10 @@ export default defineConfig({
     baseURL: `http://127.0.0.1:${String(PORT)}`,
     trace: "retain-on-failure",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "desktop", use: { ...devices["Desktop Chrome"] } },
+    { name: "mobile", use: { ...devices["Pixel 7"] } },
+  ],
   webServer: {
     command: "pnpm build && pnpm preview --host 127.0.0.1",
     url: `http://127.0.0.1:${String(PORT)}`,
