@@ -1,0 +1,29 @@
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-5) var(--space-4);
+}
+
+.mark {
+  width: 28px;
+  height: 28px;
+  flex: none;
+}
+
+.titles {
+  min-width: 0;
+  margin-right: auto;
+}
+
+.name {
+  font-size: var(--text-lg);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.tagline {
+  color: var(--color-text-3);
+  font-size: var(--text-sm);
+}

@@ -1,0 +1,34 @@
+.map {
+  position: absolute;
+  inset: 0;
+}
+
+/* Use the app's focus ring on MapLibre's controls instead of the library's blue glow. */
+.map :global(.maplibregl-ctrl-group button:focus),
+.map :global(.maplibregl-ctrl-attrib-button:focus) {
+  box-shadow: none;
+}
+
+.map :global(.maplibregl-ctrl-group button:focus-visible),
+.map :global(.maplibregl-ctrl-attrib-button:focus-visible) {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+/* Touch screens zoom with gestures; the buttons only take up space there. */
+@media (pointer: coarse) {
+  .map :global(.maplibregl-ctrl-top-left) {
+    display: none;
+  }
+}
+
+.fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--space-6);
+  background: var(--color-surface-2);
+  color: var(--color-text-2);
+  text-align: center;
+}
