@@ -10,11 +10,15 @@ from routing.risk.classification import (
     wind_level_for_load,
 )
 from routing.risk.levels import RiskLevel
+from routing.risk.scoring import RiskSegment, RouteRisk, checkpoint_coverage
 
 __all__ = [
     "CheckpointRisk",
     "Conditions",
     "RiskLevel",
+    "RiskSegment",
+    "RouteRisk",
     "assess_checkpoint",
+    "checkpoint_coverage",
     "wind_level_for_load",
 ]
