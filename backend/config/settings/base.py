@@ -5,6 +5,7 @@ database is configured. Responses from third-party services are cached in memory
 """
 
 from pathlib import Path
+from typing import Any
 
 from config.env import env_str
 
@@ -41,13 +42,20 @@ TIME_ZONE = "UTC"
 USE_I18N = False
 USE_TZ = True
 
-REST_FRAMEWORK = {
+REST_FRAMEWORK: dict[str, Any] = {
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
     "DEFAULT_PARSER_CLASSES": ["rest_framework.parsers.JSONParser"],
     "DEFAULT_AUTHENTICATION_CLASSES": [],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
     "UNAUTHENTICATED_USER": None,
+    "EXCEPTION_HANDLER": "routing.api_errors.exception_handler",
+    # Per client IP; protects the TomTom quota. Suggestions fire while typing.
+    "DEFAULT_THROTTLE_RATES": {"suggest": "60/min", "routes": "10/min"},
 }
+
+# Routing and geocoding. Optional so the API starts without it; routing endpoints then
+# answer 503 until it is set.
+TOMTOM_API_KEY = env_str("TOMTOM_API_KEY", "")
 
 CORS_ALLOW_METHODS = ["GET", "POST", "OPTIONS"]
 
@@ -61,4 +69,9 @@ LOGGING = {
         "console": {"class": "logging.StreamHandler", "formatter": "plain"},
     },
     "root": {"handlers": ["console"], "level": env_str("DJANGO_LOG_LEVEL", "INFO")},
+    # httpx logs full request URLs at INFO, and TomTom routing URLs contain the API key.
+    "loggers": {
+        "httpx": {"level": "WARNING"},
+        "httpcore": {"level": "WARNING"},
+    },
 }

@@ -104,8 +104,10 @@ routes, and the same account covers geocoding and address suggestions.
 
 ### 20. Always three routes
 
-TomTom may return fewer alternatives than requested when no sensible ones exist. In that case
-additional routes are requested through a via point offset from the main route.
+TomTom may return fewer alternatives than requested when no sensible ones exist. Extra routes are
+then requested through a point offset to either side of the main route's midpoint, and kept only
+if less than 90% of their length runs within 2 km of a route already found. These routes are
+marked as detours, and the response notes when fewer than three distinct routes exist.
 
 ### 21. Open-Meteo for weather
 
@@ -134,28 +136,54 @@ calls the health endpoint so the API stays responsive.
 Long-term support release; all dependencies support it. The API is stateless, so no database is
 configured.
 
+### 27. Arrival times follow TomTom's travel times
+
+TomTom reports road distance and travel time (including historic traffic for the departure time)
+at points along each route. Checkpoint arrival times are interpolated between those points rather
+than assuming a constant speed, so slow urban stretches are reflected.
+
+### 28. Place suggestions are limited to North America
+
+Suggestions cover the United States, Canada and Mexico, so typing "Paris" offers Paris, TX before
+Paris, France.
+
+### 29. The map receives a simplified route line
+
+Routes arrive with 10,000 or more points. The browser gets a version simplified to within 30 m of
+the road (a few hundred points); checkpoints are placed on the full-detail route.
+
+### 30. Caching and rate limits protect the routing quota
+
+Identical trips are cached for 15 minutes and place lookups for a day. Each client is limited to
+60 suggestion and 10 route requests per minute.
+
+### 31. A departure a few minutes in the past is accepted
+
+The routing API itself accepts any past departure, so the API enforces the window: from 15
+minutes ago, so a form filled in at "now" is not rejected, up to 7 days ahead.
+
 ## Interface
 
-### 27. Product name
+### 32. Product name
 
 The app is called Clearway: finding the clear road.
 
-### 28. Visual design
+### 33. Visual design
 
 Light, warm surfaces with navy text and a teal accent, set in DM Sans. Green, yellow, orange, red
 and purple are reserved for risk levels and never used as interface colours.
 
-### 29. One risk scale everywhere
+### 34. One risk scale everywhere
 
 Checkpoint markers, route bars, labels and the heatmap use the same five colours. Risk is never
 shown by colour alone: every level is also named.
 
-### 30. The heatmap shows true levels
+### 35. The heatmap shows true levels
 
 Each location on the heatmap shows its actual risk level, rather than a density blend that would
 overstate risk where samples cluster.
 
-### 31. Built for phones as well as desktops
+### 36. Built for phones as well as desktops
 
 Every screen works on phones from 360 px wide as well as on tablets and desktops: no horizontal
 scrolling, touch-sized controls, inputs large enough to avoid zoom on focus, and respect for the
