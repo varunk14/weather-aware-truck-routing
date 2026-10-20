@@ -6,9 +6,9 @@ Weather-aware truck route planner. Clearway compares three routes between two pl
 the weather the truck will meet at each checkpoint at its estimated arrival time, classifies the
 risk from wind, rain, snow and load weight, and recommends the safest route.
 
-> **Status:** in development. In place: the API and web app shell, tooling, CI, and the risk
-> engine (thresholds, load rules, route scoring and ranking). Routing, weather and the trip
-> planner interface are added in the following milestones.
+> **Status:** in development. In place: the API and web app shell, tooling, CI, the risk engine
+> (thresholds, load rules, route scoring and ranking), and truck routing with checkpoints and
+> arrival times. Weather and the trip planner interface are added in the following milestones.
 
 ## Tech stack
 
@@ -65,9 +65,14 @@ How levels, route scores and the ranking work is described in [docs/risk-model.m
 
 ## API
 
-| Method | Path          | Description                                  |
-| ------ | ------------- | -------------------------------------------- |
-| GET    | `/api/health` | Liveness check: `status`, `version`, `time`  |
+| Method | Path                  | Description                                                    |
+| ------ | --------------------- | -------------------------------------------------------------- |
+| GET    | `/api/health`         | Liveness check: `status`, `version`, `time`                    |
+| GET    | `/api/places/suggest` | Place suggestions while typing an origin or destination        |
+| POST   | `/api/routes`         | Three truck routes with checkpoints and estimated arrival times |
+
+Request and response formats, validation rules and errors: [docs/api.md](docs/api.md).
+Routing needs a TomTom API key in `backend/.env` (`TOMTOM_API_KEY`); see `backend/.env.example`.
 
 ## Project structure
 
@@ -76,6 +81,8 @@ backend/
   config/            Django project: settings (base, dev, prod, test), URLs, WSGI
   routing/           API application: views, URL routes, management commands
   routing/risk/      Risk engine: thresholds, load rules, route scoring and ranking
+  routing/clients/   TomTom client (suggestions, places, geocoding, truck routing)
+  routing/services/  Trip planning: places, route options, checkpoints and arrival times
   tests/             pytest suite
 frontend/
   src/app/           Application shell and layout
@@ -88,10 +95,12 @@ frontend/
 docs/
   decisions.md       How the specification was interpreted, and why
   risk-model.md      Risk levels, route scoring and ranking, with examples
+  api.md             API endpoints, request and response formats, errors
 ```
 
 ## Documentation
 
+- [API](docs/api.md): endpoints, request and response formats, validation and errors.
 - [Risk model](docs/risk-model.md): how weather and load become risk levels, and how routes are ranked.
 - [Design decisions](docs/decisions.md): interpretation of the specification and technical choices.
 
