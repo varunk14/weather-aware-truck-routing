@@ -1,0 +1,15 @@
+.map {
+  position: absolute;
+  inset: 0;
+}
+
+.fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--space-6);
+  background: var(--color-surface-2);
+  color: var(--color-text-2);
+  text-align: center;
+}

@@ -1,0 +1,63 @@
+/* Design tokens. Values follow the Clearway design direction (warm paper, navy, teal). */
+:root {
+  /* Surfaces */
+  --color-bg: #fbfbf8;
+  --color-panel: #fbfbf8;
+  --color-surface: #ffffff;
+  --color-surface-2: #f1f2ee;
+  --color-border: #e4e6e1;
+  --color-border-strong: #d2d6d1;
+
+  /* Text */
+  --color-text: #0d1e2d;
+  --color-text-2: #46586a;
+  --color-text-3: #7e8c98;
+
+  /* Brand */
+  --color-accent: #007a7c;
+  --color-accent-text: #ffffff;
+  --color-focus: #008080;
+
+  /* Map */
+  --color-route-selected: #0d1e2d;
+  --color-route-alt: #9aa8b3;
+  --color-route-casing: #ffffff;
+
+  /* Risk scale: the same five colours are used everywhere risk is shown. */
+  --color-risk-low: #2f9e44;
+  --color-risk-moderate: #e8b500;
+  --color-risk-high: #f06a0c;
+  --color-risk-severe: #d92d2d;
+  --color-risk-no-travel: #6d3fd9;
+
+  /* Typography */
+  --font-sans: "DM Sans Variable", "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+
+  /* Spacing (4 px grid) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* Shape and depth */
+  --radius-lg: 12px;
+  --radius-md: 9px;
+  --radius-pill: 999px;
+  --shadow-overlay: 0 8px 28px rgb(13 30 45 / 12%);
+  --overlay-bg: rgb(251 251 248 / 92%);
+
+  /* Layout */
+  --panel-width: 404px;
+
+  /* Motion */
+  --duration-fast: 150ms;
+  --duration-base: 200ms;
+}
