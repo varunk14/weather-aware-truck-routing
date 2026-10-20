@@ -6,7 +6,9 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
-    proxy: { "/api": "http://127.0.0.1:8000" },
+    // changeOrigin rewrites the Host header, so Django accepts requests from other devices
+    // on the network (for example a phone opening the dev server's network address).
+    proxy: { "/api": { target: "http://127.0.0.1:8000", changeOrigin: true } },
   },
   preview: {
     port: 4173,

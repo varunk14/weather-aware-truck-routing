@@ -4,7 +4,7 @@ import { Map as MapLibreMap, NavigationControl, setWorkerUrl } from "maplibre-gl
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
 import { useEffect, useRef, useState } from "react";
 
-import { BASEMAP_STYLE_URL, INITIAL_VIEW, isWebGLAvailable } from "./mapConfig";
+import { BASEMAP_STYLE_URL, INITIAL_BOUNDS, isWebGLAvailable } from "./mapConfig";
 import styles from "./MapView.module.css";
 
 // MapLibre looks for its worker next to its own module file, which no longer holds once the
@@ -23,8 +23,8 @@ export default function MapView() {
     const map = new MapLibreMap({
       container,
       style: BASEMAP_STYLE_URL,
-      center: INITIAL_VIEW.center,
-      zoom: INITIAL_VIEW.zoom,
+      bounds: INITIAL_BOUNDS,
+      fitBoundsOptions: { padding: 16 },
       attributionControl: { compact: true },
     });
     map.addControl(new NavigationControl({ showCompass: false }), "top-left");

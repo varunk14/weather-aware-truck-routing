@@ -13,11 +13,11 @@ export function App() {
 
   return (
     <main className={styles.app}>
-      <section className={styles.panel} aria-label="Trip planner">
+      <div className={styles.header}>
         <AppHeader apiStatus={apiStatus} />
-        <div className={styles.panelBody}>
-          <EmptyState />
-        </div>
+      </div>
+      <section className={styles.panel} aria-label="Trip planner">
+        <EmptyState />
       </section>
       <div className={styles.mapArea}>
         <Suspense fallback={<div className={styles.mapLoading} aria-hidden="true" />}>

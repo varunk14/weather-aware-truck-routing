@@ -1,11 +1,13 @@
+import type { LngLatBoundsLike } from "maplibre-gl";
+
 /** OpenFreeMap vector basemap: free, keyless, OpenStreetMap data. */
 export const BASEMAP_STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
 
-/** Continental United States. */
-export const INITIAL_VIEW = {
-  center: [-98.5, 39.5] as [number, number],
-  zoom: 3.6,
-};
+/** Continental United States, fitted to whatever screen size the map has. */
+export const INITIAL_BOUNDS: LngLatBoundsLike = [
+  [-124.8, 24.4],
+  [-66.9, 49.4],
+];
 
 export function isWebGLAvailable(): boolean {
   try {
