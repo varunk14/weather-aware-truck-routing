@@ -48,6 +48,9 @@ REST_FRAMEWORK: dict[str, Any] = {
     "DEFAULT_AUTHENTICATION_CLASSES": [],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
     "UNAUTHENTICATED_USER": None,
+    "EXCEPTION_HANDLER": "routing.api_errors.exception_handler",
+    # Per client IP; protects the TomTom quota. Suggestions fire while typing.
+    "DEFAULT_THROTTLE_RATES": {"suggest": "60/min", "routes": "10/min"},
 }
 
 # Routing and geocoding. Optional so the API starts without it; routing endpoints then

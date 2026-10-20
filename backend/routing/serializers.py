@@ -1,0 +1,138 @@
+"""Request validation and response shapes for the trip planning API."""
+
+from datetime import datetime, timedelta
+from typing import Any
+
+from django.utils import timezone
+from rest_framework import serializers
+
+from routing.clients.tomtom import Place
+from routing.geo import METERS_PER_MILE
+from routing.services.places import Address, Coordinates, Location, PlaceRef
+from routing.services.planner import ROUTE_IDS, PlannedRoute, RoutePlan, TripRequest
+
+INTERVALS_MI = (10, 25, 50)
+DEFAULT_INTERVAL_MI = 25
+MAX_LOAD_LB = 80_000
+MAX_DAYS_AHEAD = 7
+# A departure a few minutes in the past is accepted, so "leave now" survives a slow form.
+DEPARTURE_GRACE = timedelta(minutes=15)
+
+
+class LocationSerializer(serializers.Serializer[Any]):
+    """One of: a picked suggestion, coordinates, or free text."""
+
+    place_id = serializers.CharField(required=False, max_length=64)
+    place_type = serializers.CharField(required=False, max_length=32)
+    lat = serializers.FloatField(required=False, min_value=-90, max_value=90)
+    lon = serializers.FloatField(required=False, min_value=-180, max_value=180)
+    query = serializers.CharField(required=False, max_length=200)
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        has_place = "place_id" in attrs or "place_type" in attrs
+        has_coordinates = "lat" in attrs or "lon" in attrs
+        has_query = "query" in attrs
+        if has_place + has_coordinates + has_query != 1:
+            raise serializers.ValidationError(
+                "Give exactly one of: place_id with place_type, lat with lon, or query."
+            )
+        if has_place and not {"place_id", "place_type"} <= attrs.keys():
+            raise serializers.ValidationError("place_id and place_type must be given together.")
+        if has_coordinates and not {"lat", "lon"} <= attrs.keys():
+            raise serializers.ValidationError("lat and lon must be given together.")
+        return attrs
+
+
+def to_location(attrs: dict[str, Any]) -> Location:
+    if "place_id" in attrs:
+        return PlaceRef(type=attrs["place_type"], id=attrs["place_id"])
+    if "lat" in attrs:
+        return Coordinates(lat=attrs["lat"], lon=attrs["lon"])
+    return Address(text=attrs["query"])
+
+
+class TripRequestSerializer(serializers.Serializer[Any]):
+    origin = LocationSerializer()
+    destination = LocationSerializer()
+    departure = serializers.DateTimeField()
+    load_lb = serializers.IntegerField(min_value=1, max_value=MAX_LOAD_LB)
+    interval_mi = serializers.ChoiceField(choices=INTERVALS_MI, default=DEFAULT_INTERVAL_MI)
+
+    def validate_departure(self, value: datetime) -> datetime:
+        now = timezone.now()
+        if value < now - DEPARTURE_GRACE:
+            raise serializers.ValidationError("Departure must be now or later.")
+        if value > now + timedelta(days=MAX_DAYS_AHEAD):
+            raise serializers.ValidationError(
+                f"Departure must be within the next {MAX_DAYS_AHEAD} days."
+            )
+        return value
+
+    def to_trip(self) -> TripRequest:
+        data = self.validated_data
+        return TripRequest(
+            origin=to_location(data["origin"]),
+            destination=to_location(data["destination"]),
+            departure=data["departure"],
+            load_lb=data["load_lb"],
+            interval_mi=int(data["interval_mi"]),
+        )
+
+
+def plan_to_json(plan: RoutePlan) -> dict[str, Any]:
+    return {
+        "origin": _place_json(plan.origin),
+        "destination": _place_json(plan.destination),
+        "load_lb": plan.load_lb,
+        "interval_mi": plan.interval_mi,
+        "routes": [_route_json(route) for route in plan.routes],
+        "notes": _notes(plan),
+    }
+
+
+def _place_json(place: Place) -> dict[str, Any]:
+    return {
+        "title": place.title,
+        "lat": round(place.position.lat, 5),
+        "lon": round(place.position.lon, 5),
+    }
+
+
+def _route_json(route: PlannedRoute) -> dict[str, Any]:
+    return {
+        "id": route.route_id,
+        "distance_mi": round(route.distance_m / METERS_PER_MILE, 1),
+        "duration_s": round(route.duration_s),
+        "traffic_delay_s": round(route.traffic_delay_s),
+        "departure": route.departure.isoformat(),
+        "arrival": route.arrival.isoformat(),
+        "detour": route.detour,
+        "geometry": {
+            "type": "LineString",
+            "coordinates": [[round(p.lon, 5), round(p.lat, 5)] for p in route.geometry],
+        },
+        "checkpoints": [
+            {
+                "index": index,
+                "mile": round(checkpoint.distance_m / METERS_PER_MILE, 1),
+                "lat": round(checkpoint.position.lat, 5),
+                "lon": round(checkpoint.position.lon, 5),
+                "eta": checkpoint.eta.isoformat(timespec="seconds"),
+            }
+            for index, checkpoint in enumerate(route.checkpoints)
+        ],
+    }
+
+
+def _notes(plan: RoutePlan) -> list[str]:
+    notes = []
+    if len(plan.routes) < len(ROUTE_IDS):
+        notes.append(f"Only {len(plan.routes)} distinct truck routes connect these places.")
+    detours = [route.route_id for route in plan.routes if route.detour]
+    if detours:
+        names = " and ".join(f"Route {route_id}" for route_id in detours)
+        notes.append(
+            f"{names} came from routing through a point beside the main route, "
+            "because fewer direct alternatives were available."
+        )
+    return notes

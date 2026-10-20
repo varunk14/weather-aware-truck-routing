@@ -20,5 +20,8 @@ CSRF_COOKIE_SECURE = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
 
+# One proxy sits in front of the app; rate limits use the client address it forwards.
+REST_FRAMEWORK = {**REST_FRAMEWORK, "NUM_PROXIES": 1}  # noqa: F405
+
 # HSTS preload lists accept registrable domains only; the API runs on a platform subdomain.
 SILENCED_SYSTEM_CHECKS = ["security.W021"]
