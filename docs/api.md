@@ -190,5 +190,5 @@ Error bodies have a `detail` message, for example
 ## Rate limits
 
 Per client IP address: 60 suggestion requests and 10 route requests per minute. Identical trips
-are cached for 15 minutes, weather included, and place lookups for a day, so reloading does not
+are cached for an hour, weather included, and place lookups for a day, so reloading does not
 use the quota again.
