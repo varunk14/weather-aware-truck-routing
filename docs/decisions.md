@@ -260,7 +260,9 @@ previous plan on screen.
 ### 45. A calendar for the departure
 
 The browser's own date picker cannot be styled and, on desktops, has no confirm button. The form
-uses its own calendar instead: a month view in which only the allowed days (now to seven days
-ahead) can be picked, a time in 15 minute steps with past times disabled, and Cancel and Done.
-The departure changes only on Done; Escape or a click outside leave it as it was. The arrow keys
-move between days.
+uses its own calendar instead. The allowed days (now to seven days ahead) always fit in two
+weeks, so the calendar shows just those two weeks, with no month to page through; the first of a
+new month is labelled. The time is picked from buttons, hours and quarter hours with AM and PM,
+rather than drop-down lists, which the browser would draw in its own style; times that have
+passed are disabled. The departure changes only on Done; Cancel, Escape or a click outside leave
+it as it was. The arrow keys move between days and between times.
