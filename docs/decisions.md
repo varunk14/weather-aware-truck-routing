@@ -299,7 +299,10 @@ the map once per plan.
 ### 48. The truck on the timeline
 
 The timeline shows where the truck on the selected route is at the slider's time, from the
-checkpoints' arrival times, so it moves at the pace TomTom expects, slower in traffic. Playing
+checkpoints' arrival times, so it moves at the pace TomTom expects, slower in traffic. The
+slider always runs 48 hours, the forecast window the specification asks for, so a shorter trip
+arrives part way along it: a mark on the track and the text ("arrives at +24.5 h") say when. Playing
 runs the 48 hours in 12 seconds. On a phone the timeline floats above the lowered sheet and hides
-while the sheet is raised, when it would cover most of the map; hiding it pauses playing and
+while the sheet is raised or a checkpoint's details are open, when it would cover most of the
+map; hiding it pauses playing and
 hides the heatmap, which is never shown without its legend.
