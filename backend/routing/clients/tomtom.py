@@ -22,7 +22,6 @@ logger = logging.getLogger(__name__)
 
 BASE_URL = "https://api.tomtom.com"
 PLACES_API_VERSION = "3"
-COUNTRIES = ("US", "CA", "MX")
 KG_PER_LB = 0.45359237
 
 _PLACE_ID = re.compile(r"[A-Za-z0-9_-]{1,64}")
@@ -108,11 +107,7 @@ class TomTomClient:
             "POST",
             "/maps/orbis/places/suggest",
             headers=self._places_headers("results"),
-            json={
-                "query": query,
-                "maxResults": limit,
-                "filters": {"countryCodesIso2": list(COUNTRIES)},
-            },
+            json={"query": query, "maxResults": limit},
         )
         suggestions = []
         for item in data.get("results", []):
@@ -149,7 +144,7 @@ class TomTomClient:
         data = self._request(
             "GET",
             f"/search/2/geocode/{quote(query, safe='')}.json",
-            params={"limit": 1, "countrySet": ",".join(COUNTRIES), "key": self._key},
+            params={"limit": 1, "key": self._key},
         )
         results = data.get("results") or []
         if not results:

@@ -8,6 +8,7 @@ from django.utils import timezone
 from routing import clients
 from routing.clients.tomtom import TomTomNotConfiguredError
 from routing.geo import LatLon
+from routing.services import planner
 from routing.throttles import RoutesThrottle, SuggestThrottle
 from tests.routing.conftest import (
     CALM,
@@ -305,6 +306,38 @@ class TestWeatherRisk:
         post(client, body)
 
         assert len(open_meteo.requests) == 1
+
+
+class TestTripLength:
+    def test_a_trip_longer_than_the_limit_is_refused_before_routing(
+        self, client: Client, api_tomtom: FakeTomTom, open_meteo: FakeOpenMeteo
+    ) -> None:
+        # Chicago to Lisbon: about 4,000 miles in a straight line.
+        response = post(client, trip(destination={"lat": 38.72, "lon": -9.14}))
+
+        assert response.status_code == 400
+        message = response.json()["destination"][0]
+        assert message.startswith("This trip is about 3,9")
+        assert "up to 3,500 mi" in message
+        assert api_tomtom.count("route") == 0
+        assert open_meteo.requests == []
+
+    def test_a_route_longer_than_the_limit_is_refused_before_the_weather_lookup(
+        self,
+        client: Client,
+        api_tomtom: FakeTomTom,
+        open_meteo: FakeOpenMeteo,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        # Chicago to Milwaukee: 81 miles in a straight line, so the first check passes; the
+        # recorded routes are 90 miles and longer, so the road distance is over the limit.
+        monkeypatch.setattr(planner, "MAX_TRIP_MI", 85)
+
+        response = post(client, trip())
+
+        assert response.status_code == 400
+        assert response.json()["destination"][0].startswith("This trip is about 90 mi")
+        assert open_meteo.requests == []
 
 
 class TestErrors:

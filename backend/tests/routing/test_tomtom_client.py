@@ -7,7 +7,6 @@ import pytest
 
 from routing import clients
 from routing.clients.tomtom import (
-    COUNTRIES,
     NoRouteFoundError,
     PlaceNotFoundError,
     TomTomClient,
@@ -45,7 +44,7 @@ class TestSuggest:
         assert suggestions[0].type == "areas"
         assert suggestions[0].subtitle == "United States"
 
-    def test_sends_the_key_in_a_header_and_limits_countries(self, tomtom: FakeTomTom) -> None:
+    def test_sends_the_key_in_a_header_and_searches_worldwide(self, tomtom: FakeTomTom) -> None:
         tomtom.client().suggest("milwau", limit=3)
 
         request = tomtom.requests[0]
@@ -54,11 +53,7 @@ class TestSuggest:
         assert request.headers["TomTom-Api-Version"] == "3"
         assert "key" not in request.url.params
         body = json.loads(request.content)
-        assert body == {
-            "query": "milwau",
-            "maxResults": 3,
-            "filters": {"countryCodesIso2": list(COUNTRIES)},
-        }
+        assert body == {"query": "milwau", "maxResults": 3}
 
     def test_skips_results_without_a_details_reference(self, tomtom: FakeTomTom) -> None:
         tomtom.respond("suggest", body={"results": [{"id": "x", "title": "No details"}]})
@@ -103,7 +98,7 @@ class TestGeocode:
         assert place.position == LatLon(43.041072, -87.909421)
         request = tomtom.requests[0]
         assert request.url.raw_path.startswith(b"/search/2/geocode/Milwaukee%2C%20WI.json")
-        assert request.url.params["countrySet"] == "US,CA,MX"
+        assert "countrySet" not in request.url.params
 
     def test_no_match_raises_place_not_found(self, tomtom: FakeTomTom) -> None:
         tomtom.respond("geocode", body={"results": []})
