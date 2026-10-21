@@ -1,5 +1,6 @@
 import { useId, useRef } from "react";
 
+import { DepartureField } from "./DepartureField";
 import fields from "./fields.module.css";
 import { PlaceInput } from "./PlaceInput";
 import styles from "./TripForm.module.css";
@@ -17,7 +18,6 @@ interface TripFormProps {
 export function TripForm({ draft, errors, busy, onChange, onSubmit }: TripFormProps) {
   const id = useId();
   const formRef = useRef<HTMLFormElement>(null);
-  const departureId = `${id}-departure`;
   const loadId = `${id}-load`;
   const errorId = (field: DraftField) => `${id}-${field}-error`;
 
@@ -81,27 +81,13 @@ export function TripForm({ draft, errors, busy, onChange, onSubmit }: TripFormPr
         />
       </div>
 
-      <div className={fields.field}>
-        <label className={fields.label} htmlFor={departureId}>
-          Departure
-        </label>
-        <input
-          id={departureId}
-          className={fields.input}
-          type="datetime-local"
-          value={draft.departure}
-          aria-invalid={errors.departure ? true : undefined}
-          aria-describedby={errors.departure ? errorId("departure") : `${departureId}-hint`}
-          onChange={(event) => {
-            onChange({ ...draft, departure: event.target.value }, "departure");
-          }}
-        />
-        {fieldError("departure") ?? (
-          <p id={`${departureId}-hint`} className={fields.hint}>
-            Your local time
-          </p>
-        )}
-      </div>
+      <DepartureField
+        value={draft.departure}
+        error={errors.departure}
+        onChange={(departure) => {
+          onChange({ ...draft, departure }, "departure");
+        }}
+      />
 
       <div className={styles.pair}>
         <div className={fields.field}>

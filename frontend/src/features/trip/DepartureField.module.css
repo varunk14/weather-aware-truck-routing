@@ -1,0 +1,83 @@
+.departure {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* One row of day buttons; on narrow screens the row scrolls sideways, never the page. */
+.days {
+  display: flex;
+  gap: var(--space-2);
+  margin: 0 calc(-1 * var(--space-1));
+  padding: 2px var(--space-1) var(--space-1);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.day {
+  position: relative;
+  display: grid;
+  min-width: 64px;
+  min-height: 44px;
+  flex: none;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-2);
+  cursor: pointer;
+  font-weight: 500;
+  place-items: center;
+  transition:
+    border-color var(--duration-fast),
+    background var(--duration-fast),
+    color var(--duration-fast);
+  white-space: nowrap;
+}
+
+.day:hover {
+  border-color: var(--color-text-3);
+}
+
+.day input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.day:has(input:checked) {
+  border-color: var(--color-route-selected);
+  background: var(--color-route-selected);
+  color: var(--color-route-casing);
+  font-weight: 600;
+}
+
+.day:has(input:focus-visible) {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.timeRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+/* More specific than the shared input style, which is full width. */
+.timeRow .time {
+  width: auto;
+  min-width: 128px;
+  flex: none;
+  cursor: pointer;
+}
+
+.summary {
+  color: var(--color-text-2);
+  font-size: var(--text-sm);
+}

@@ -128,12 +128,13 @@ describe("TripForm", () => {
     );
   });
 
-  it("starts with 25 mile checkpoints and a departure in the future", () => {
+  it("starts with 25 mile checkpoints and a departure at the next whole hour", () => {
     render(<Planner />);
 
     expect(screen.getByRole("radio", { name: "25 mi" })).toBeChecked();
-    const departure = screen.getByLabelText<HTMLInputElement>("Departure");
-    expect(new Date(departure.value).getTime()).toBeGreaterThan(Date.now());
-    expect(departure).toHaveAccessibleDescription("Your local time");
+    const time = screen.getByRole("combobox", { name: "Departure time" });
+    expect(time).toHaveAccessibleDescription(/^Leaves /);
+    const days = screen.getAllByRole("radio", { name: /^(Today|Tomorrow)$/ });
+    expect(days.filter((day) => (day as HTMLInputElement).checked)).toHaveLength(1);
   });
 });
