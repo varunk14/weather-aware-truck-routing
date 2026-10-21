@@ -1,4 +1,5 @@
-import type { RiskCause, RiskLevel } from "./types";
+import { formatMiles } from "./format";
+import type { RiskCause, RiskLevel, RouteRisk } from "./types";
 
 /** Levels from safest to most dangerous, in the order the API scores them (0 to 4). */
 export const RISK_LEVELS: readonly RiskLevel[] = ["low", "moderate", "high", "severe", "no_travel"];
@@ -39,4 +40,11 @@ export function describeCauses(causes: readonly RiskCause[]): string {
   const words = causes.map((cause) => CAUSE_LABELS[cause]);
   if (words.length <= 1) return words.join("");
   return `${words.slice(0, -1).join(", ")} and ${words.at(-1) ?? ""}`;
+}
+
+/** "Low 797 mi, High 50 mi": the miles at each level a route has. */
+export function describeRiskMiles(risk: RouteRisk): string {
+  return RISK_LEVELS.filter((level) => risk.miles[level] > 0)
+    .map((level) => `${RISK_LABELS[level]} ${formatMiles(risk.miles[level])}`)
+    .join(", ");
 }

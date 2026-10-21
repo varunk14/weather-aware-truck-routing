@@ -60,6 +60,10 @@ describe("TripForm", () => {
     render(<Planner />);
 
     await user.click(screen.getByRole("button", { name: "Plan routes" }));
+    // The form first moves focus to the first problem; type only after that has happened.
+    await waitFor(() => {
+      expect(screen.getByRole("combobox", { name: "Origin" })).toHaveFocus();
+    });
     await user.type(screen.getByRole("textbox", { name: "Load weight (lb)" }), "4");
 
     expect(screen.queryByText(/whole pounds/)).not.toBeInTheDocument();
