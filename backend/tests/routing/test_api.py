@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Any
 
+import httpx
 import pytest
 from django.test import Client
 from django.utils import timezone
@@ -15,6 +16,7 @@ from tests.routing.conftest import (
     FakeOpenMeteo,
     FakeTomTom,
     WeatherValues,
+    is_heatmap_request,
     load,
     load_open_meteo,
 )
@@ -300,7 +302,7 @@ class TestWeatherRisk:
         body = post(client, trip()).json()
 
         checkpoints = sum(len(r["checkpoints"]) for r in body["routes"])
-        assert len(open_meteo.requests) == 1
+        assert len(open_meteo.checkpoint_requests()) == 1
         # The shared origin and destination are fetched once, not once per route.
         assert open_meteo.points_requested() < checkpoints
 
@@ -310,7 +312,7 @@ class TestWeatherRisk:
         post(client, trip())
 
         # Departure 13:00 -05:00 and the last arrival 16:02 -05:00, padded by two hours.
-        params = open_meteo.requests[0].url.params
+        params = open_meteo.checkpoint_requests()[0].url.params
         assert params["start_hour"] == "2026-10-21T16:00"
         assert params["end_hour"] == "2026-10-22T00:00"
 
@@ -321,7 +323,91 @@ class TestWeatherRisk:
         post(client, body)
         post(client, body)
 
-        assert len(open_meteo.requests) == 1
+        assert len(open_meteo.checkpoint_requests()) == 1
+        assert len(open_meteo.heatmap_requests()) == 1
+
+
+class TestHeatmap:
+    def test_the_plan_carries_hourly_frames_for_the_corridor(
+        self, client: Client, api_tomtom: FakeTomTom, open_meteo: FakeOpenMeteo
+    ) -> None:
+        open_meteo.weather = wind(40)
+
+        heatmap = post(client, trip()).json()["heatmap"]
+
+        assert heatmap["frames"] == 50
+        assert heatmap["spacing_m"] == 20_000
+        assert heatmap["cell_size"]["lat"] == pytest.approx(20_000 / 111_320, abs=1e-5)
+        assert datetime.fromisoformat(heatmap["start"]).minute == 0
+        cell = heatmap["cells"][0]
+        assert set(cell) == {"lat", "lon", "risk", "wind", "rain", "snow"}
+        assert len(cell["risk"]) == len(cell["wind"]) == 50
+        # 40 mph is High (2); the 38,000 lb load is not heavy enough to raise it.
+        assert cell["risk"][0] == 2
+        assert cell["wind"][0] == 40.0
+        assert len(open_meteo.heatmap_requests()) == 1
+
+    def test_the_routes_are_still_planned_when_the_heatmap_weather_fails(
+        self, client: Client, api_tomtom: FakeTomTom, open_meteo: FakeOpenMeteo
+    ) -> None:
+        def heatmap_fails(request: httpx.Request) -> httpx.Response:
+            if is_heatmap_request(request):
+                return httpx.Response(503)
+            return open_meteo.forecast_response(request)
+
+        open_meteo.override = heatmap_fails
+
+        response = post(client, trip())
+
+        assert response.status_code == 200
+        assert response.json()["heatmap"] is None
+        assert len(response.json()["routes"]) == 3
+
+    def test_a_plan_without_its_heatmap_is_not_kept_long(
+        self,
+        client: Client,
+        api_tomtom: FakeTomTom,
+        open_meteo: FakeOpenMeteo,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(planner, "PLAN_WITHOUT_HEATMAP_CACHE_S", 0)
+
+        def heatmap_fails(request: httpx.Request) -> httpx.Response:
+            if is_heatmap_request(request):
+                return httpx.Response(503)
+            return open_meteo.forecast_response(request)
+
+        open_meteo.override = heatmap_fails
+        body = trip()
+        assert post(client, body).json()["heatmap"] is None
+        open_meteo.override = None
+
+        assert post(client, body).json()["heatmap"] is not None
+
+    def test_an_unexpected_heatmap_error_does_not_lose_the_routes(
+        self, client: Client, api_tomtom: FakeTomTom, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def broken(*args: object) -> None:
+            raise RuntimeError("unexpected")
+
+        monkeypatch.setattr(planner, "corridor_heatmap", broken)
+
+        response = post(client, trip())
+
+        assert response.status_code == 200
+        assert response.json()["heatmap"] is None
+
+    def test_a_checkpoint_weather_failure_is_still_reported(
+        self, client: Client, api_tomtom: FakeTomTom, open_meteo: FakeOpenMeteo
+    ) -> None:
+        def checkpoints_fail(request: httpx.Request) -> httpx.Response:
+            if is_heatmap_request(request):
+                return open_meteo.forecast_response(request)
+            return httpx.Response(503)
+
+        open_meteo.override = checkpoints_fail
+
+        assert post(client, trip()).status_code == 503
 
 
 class TestTripLength:

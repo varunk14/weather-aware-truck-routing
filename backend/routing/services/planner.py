@@ -1,19 +1,22 @@
 """Plans a trip: resolves the places, finds route options, places checkpoints, looks up the
 weather at each checkpoint for the truck's arrival time, scores every route and recommends one.
+The corridor heatmap's weather is fetched at the same time as the checkpoints'; if only that
+lookup fails, the plan is still returned, without a heatmap.
 
 Plans are cached for a few minutes, so reloading the same trip calls neither TomTom nor
 Open-Meteo again. Only the simplified geometry is kept, which keeps cached plans small.
 """
 
 import hashlib
-from collections.abc import Sequence
+import logging
+from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime
 
 from django.core.cache import cache
 
-from routing.clients.open_meteo import OpenMeteoClient
+from routing.clients.open_meteo import OpenMeteoClient, WeatherError
 from routing.clients.tomtom import Place, TomTomClient
 from routing.geo import METERS_PER_MILE, LatLon, haversine_m, simplify
 from routing.risk import (
@@ -27,12 +30,17 @@ from routing.risk import (
 )
 from routing.risk import RouteOption as RankedRoute
 from routing.services.checkpoints import Checkpoint, place_checkpoints
+from routing.services.heatmap import Heatmap, corridor_heatmap
 from routing.services.places import Location, resolve
 from routing.services.route_options import RouteOption, find_route_options
 from routing.services.weather import Stop, Weather, weather_at_stops
 
+logger = logging.getLogger(__name__)
+
 GEOMETRY_TOLERANCE_M = 30
 PLAN_CACHE_S = 15 * 60
+# A plan whose heatmap could not be fetched is kept only briefly, so the heatmap returns soon.
+PLAN_WITHOUT_HEATMAP_CACHE_S = 60
 MIN_TRIP_M = 1_000
 # The longest trip planned. US coast to coast is about 2,800 miles; longer trips would need
 # thousands of forecast locations and could run past the 16 day forecast.
@@ -96,6 +104,7 @@ class RoutePlan:
     interval_mi: int
     routes: tuple[PlannedRoute, ...]
     recommendation: Recommendation
+    heatmap: Heatmap | None = None
 
     def rank(self, route_id: str) -> int:
         """1 for the recommended route, then upwards in ranking order."""
@@ -120,7 +129,7 @@ def plan_trip(client: TomTomClient, weather: OpenMeteoClient, trip: TripRequest)
     plan: RoutePlan | None = cache.get(key)
     if plan is None:
         plan = _build_plan(client, weather, origin, target, trip)
-        cache.set(key, plan, PLAN_CACHE_S)
+        cache.set(key, plan, PLAN_CACHE_S if plan.heatmap else PLAN_WITHOUT_HEATMAP_CACHE_S)
     return plan
 
 
@@ -140,10 +149,24 @@ def _build_plan(
     named = list(zip(ROUTE_IDS, options, strict=False))
     checkpoints = [place_checkpoints(option.route, trip.interval_mi) for _, option in named]
 
-    # One weather lookup for the checkpoints of every route, then split back per route.
-    forecasts = weather_at_stops(
-        weather, [Stop(c.position, c.eta) for route in checkpoints for c in route]
-    )
+    # One weather lookup for the checkpoints of every route, then split back per route, while
+    # the heatmap's weather is fetched alongside. If the checkpoints' lookup fails, the error is
+    # returned at once; the heatmap's request finishes in the background and fills its cache.
+    pool = ThreadPoolExecutor(max_workers=1)
+    try:
+        heatmap_lookup = pool.submit(
+            corridor_heatmap,
+            weather,
+            [option.route.points for _, option in named],
+            trip.departure,
+            trip.load_lb,
+        )
+        forecasts = weather_at_stops(
+            weather, [Stop(c.position, c.eta) for route in checkpoints for c in route]
+        )
+        heatmap = _heatmap(heatmap_lookup.result)
+    finally:
+        pool.shutdown(wait=False)
     routes = []
     start = 0
     for (route_id, option), route_checkpoints in zip(named, checkpoints, strict=True):
@@ -160,7 +183,19 @@ def _build_plan(
         interval_mi=trip.interval_mi,
         routes=tuple(routes),
         recommendation=recommend([RankedRoute(r.route_id, r.duration_s, r.risk) for r in routes]),
+        heatmap=heatmap,
     )
+
+
+def _heatmap(result: Callable[[], Heatmap]) -> Heatmap | None:
+    """The heatmap, or None if it could not be made: it is optional, the routes are not."""
+    try:
+        return result()
+    except WeatherError as error:
+        logger.warning("Heatmap skipped: %s", error)
+    except Exception:
+        logger.exception("Heatmap failed")
+    return None
 
 
 def _plan_route(

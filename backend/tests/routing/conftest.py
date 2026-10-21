@@ -20,6 +20,8 @@ from routing import clients
 from routing.clients.open_meteo import HOURLY_UNITS, OpenMeteoClient
 from routing.clients.tomtom import TomTomClient
 from routing.geo import LatLon
+from routing.services.heatmap import FRAME_COUNT
+from routing.services.weather import FALLBACK_HOURS
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "tomtom"
 OPEN_METEO_FIXTURES = FIXTURES.parent / "open_meteo"
@@ -59,6 +61,10 @@ class FakeOpenMeteo:
         self.requests.append(request)
         if self.override is not None:
             return self.override(request)
+        return self.forecast_response(request)
+
+    def forecast_response(self, request: httpx.Request) -> httpx.Response:
+        """The answer from ``weather``, for overrides that only change some requests."""
         params = request.url.params
         points = [
             LatLon(float(lat), float(lon))
@@ -88,10 +94,25 @@ class FakeOpenMeteo:
         self.override = lambda request: httpx.Response(status, json=body)
 
     def points_requested(self) -> int:
-        return sum(len(r.url.params["latitude"].split(",")) for r in self.requests)
+        return sum(len(r.url.params["latitude"].split(",")) for r in self.checkpoint_requests())
+
+    def heatmap_requests(self) -> list[httpx.Request]:
+        return [r for r in self.requests if is_heatmap_request(r)]
+
+    def checkpoint_requests(self) -> list[httpx.Request]:
+        heatmap = self.heatmap_requests()
+        return [r for r in self.requests if r not in heatmap]
 
     def client(self, **kwargs: Any) -> OpenMeteoClient:
         return OpenMeteoClient(transport=httpx.MockTransport(self.handle), **kwargs)
+
+
+def is_heatmap_request(request: httpx.Request) -> bool:
+    """Heatmap requests ask for every frame hour, padded by the fallback window."""
+    params = request.url.params
+    start = datetime.strptime(params["start_hour"], HOUR_FORMAT)
+    end = datetime.strptime(params["end_hour"], HOUR_FORMAT)
+    return (end - start) // timedelta(hours=1) == FRAME_COUNT - 1 + 2 * FALLBACK_HOURS
 
 
 class FakeTomTom:
