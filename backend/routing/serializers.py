@@ -8,8 +8,15 @@ from rest_framework import serializers
 
 from routing.clients.tomtom import Place
 from routing.geo import METERS_PER_MILE
+from routing.risk import RiskLevel, RouteRisk
 from routing.services.places import Address, Coordinates, Location, PlaceRef
-from routing.services.planner import ROUTE_IDS, PlannedRoute, RoutePlan, TripRequest
+from routing.services.planner import (
+    ROUTE_IDS,
+    AssessedCheckpoint,
+    PlannedRoute,
+    RoutePlan,
+    TripRequest,
+)
 
 INTERVALS_MI = (10, 25, 50)
 DEFAULT_INTERVAL_MI = 25
@@ -85,7 +92,12 @@ def plan_to_json(plan: RoutePlan) -> dict[str, Any]:
         "destination": _place_json(plan.destination),
         "load_lb": plan.load_lb,
         "interval_mi": plan.interval_mi,
-        "routes": [_route_json(route) for route in plan.routes],
+        "routes": [_route_json(route, plan.rank(route.route_id)) for route in plan.routes],
+        "recommendation": {
+            "route_id": plan.recommendation.best.route_id,
+            "reason": plan.recommendation.reason,
+            "safe": plan.recommendation.is_safe,
+        },
         "notes": _notes(plan),
     }
 
@@ -98,9 +110,10 @@ def _place_json(place: Place) -> dict[str, Any]:
     }
 
 
-def _route_json(route: PlannedRoute) -> dict[str, Any]:
+def _route_json(route: PlannedRoute, rank: int) -> dict[str, Any]:
     return {
         "id": route.route_id,
+        "rank": rank,
         "distance_mi": round(route.distance_m / METERS_PER_MILE, 1),
         "duration_s": round(route.duration_s),
         "traffic_delay_s": round(route.traffic_delay_s),
@@ -111,17 +124,50 @@ def _route_json(route: PlannedRoute) -> dict[str, Any]:
             "type": "LineString",
             "coordinates": [[round(p.lon, 5), round(p.lat, 5)] for p in route.geometry],
         },
+        "risk": _route_risk_json(route.risk),
         "checkpoints": [
-            {
-                "index": index,
-                "mile": round(checkpoint.distance_m / METERS_PER_MILE, 1),
-                "lat": round(checkpoint.position.lat, 5),
-                "lon": round(checkpoint.position.lon, 5),
-                "eta": checkpoint.eta.isoformat(timespec="seconds"),
-            }
+            _checkpoint_json(index, checkpoint)
             for index, checkpoint in enumerate(route.checkpoints)
         ],
     }
+
+
+def _route_risk_json(risk: RouteRisk) -> dict[str, Any]:
+    return {
+        "miles": {_level_key(level): round(risk.miles(level), 1) for level in RiskLevel},
+        "average": round(risk.average_risk, 3),
+        "worst": _level_key(risk.worst_level),
+    }
+
+
+def _checkpoint_json(index: int, assessed: AssessedCheckpoint) -> dict[str, Any]:
+    checkpoint, weather, risk = assessed.checkpoint, assessed.weather, assessed.risk
+    return {
+        "index": index,
+        "mile": round(checkpoint.distance_m / METERS_PER_MILE, 1),
+        "lat": round(checkpoint.position.lat, 5),
+        "lon": round(checkpoint.position.lon, 5),
+        "eta": checkpoint.eta.isoformat(timespec="seconds"),
+        "weather": {
+            "wind_mph": round(weather.wind_mph, 1),
+            "gust_mph": round(weather.gust_mph, 1),
+            "rain_in_hr": round(weather.rain_in_per_hr, 3),
+            "snow_in_hr": round(weather.snow_in_per_hr, 3),
+        },
+        "risk": {
+            "level": _level_key(risk.level),
+            "score": int(risk.level),
+            "wind": _level_key(risk.wind),
+            "rain": _level_key(risk.rain),
+            "snow": _level_key(risk.snow),
+            "causes": list(risk.causes),
+        },
+    }
+
+
+def _level_key(level: RiskLevel) -> str:
+    """Stable machine name of a level: low, moderate, high, severe, no_travel."""
+    return level.name.lower()
 
 
 def _notes(plan: RoutePlan) -> list[str]:
