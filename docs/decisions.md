@@ -142,10 +142,14 @@ TomTom reports road distance and travel time (including historic traffic for the
 at points along each route. Checkpoint arrival times are interpolated between those points rather
 than assuming a constant speed, so slow urban stretches are reflected.
 
-### 28. Place suggestions are limited to North America
+### 28. Places anywhere, trips up to 3,500 miles
 
-Suggestions cover the United States, Canada and Mexico, so typing "Paris" offers Paris, TX before
-Paris, France.
+The specification names no region, so places can be anywhere TomTom has truck routing: the
+United States, Canada, Europe, Australia, India and most other regions. Distances, speeds and
+weights stay in the specification's US units everywhere. A trip may be at most 3,500 miles (US
+coast to coast is about 2,800): longer trips would need thousands of forecast locations and
+could run past the 16 day forecast. The limit is checked first on the straight-line distance,
+so a trip across an ocean is refused without a routing request, and then on the shortest route.
 
 ### 29. The map receives a simplified route line
 
