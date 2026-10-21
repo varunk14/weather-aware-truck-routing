@@ -1,0 +1,61 @@
+{
+ "latitude": 41.879498,
+ "longitude": -87.64974,
+ "generationtime_ms": 0.10514259338378906,
+ "utc_offset_seconds": 0,
+ "timezone": "GMT",
+ "timezone_abbreviation": "GMT",
+ "elevation": 265.0,
+ "hourly_units": {
+  "time": "iso8601",
+  "wind_speed_10m": "mp/h",
+  "wind_gusts_10m": "mp/h",
+  "rain": "inch",
+  "showers": "inch",
+  "snowfall": "inch"
+ },
+ "hourly": {
+  "time": [
+   "2026-10-21T18:00",
+   "2026-10-21T19:00",
+   "2026-10-21T20:00",
+   "2026-10-21T21:00",
+   "2026-10-21T22:00"
+  ],
+  "wind_speed_10m": [
+   2.4,
+   5.2,
+   6.0,
+   5.7,
+   5.4
+  ],
+  "wind_gusts_10m": [
+   4.3,
+   5.1,
+   6.7,
+   6.3,
+   7.2
+  ],
+  "rain": [
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "showers": [
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "snowfall": [
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ }
+}
