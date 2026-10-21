@@ -5,6 +5,7 @@ The URL length caps a request at a few hundred locations, so callers send at mos
 ``MAX_POINTS_PER_REQUEST`` per call. Times are requested and returned in UTC.
 """
 
+import functools
 import logging
 import math
 from collections.abc import Sequence
@@ -165,11 +166,16 @@ def _parse_forecast(item: dict[str, Any]) -> HourlyForecast:
         if units[name] != unit:
             raise ValueError(f"Unexpected unit for {name}: {units[name]!r}")
     hourly = item["hourly"]
-    times = tuple(
-        datetime.strptime(time, _HOUR_FORMAT).replace(tzinfo=UTC) for time in hourly["time"]
-    )
+    times = tuple(_parse_hour(time) for time in hourly["time"])
     wind, gusts, rain, showers, snow = (_values(hourly[name], len(times)) for name in HOURLY_UNITS)
     return HourlyForecast(times, wind, gusts, rain, showers, snow)
+
+
+@functools.lru_cache(maxsize=4096)
+def _parse_hour(text: str) -> datetime:
+    """A forecast hour; every location in a response repeats the same hours, so each is parsed
+    once."""
+    return datetime.strptime(text, _HOUR_FORMAT).replace(tzinfo=UTC)
 
 
 def _values(raw: list[Any], length: int) -> tuple[Value, ...]:

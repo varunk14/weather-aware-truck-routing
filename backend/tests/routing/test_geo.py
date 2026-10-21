@@ -1,6 +1,9 @@
+import math
 from itertools import pairwise
 
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from routing.geo import (
     LatLon,
@@ -77,6 +80,49 @@ class TestSimplify:
 
     def test_short_lines_are_returned_unchanged(self) -> None:
         assert simplify([CHICAGO, MILWAUKEE], 10) == [CHICAGO, MILWAUKEE]
+
+
+def plain_douglas_peucker(points: list[LatLon], tolerance_m: float) -> list[LatLon]:
+    """The textbook algorithm, on the same flat projection, to check the fast one against."""
+    ky = math.radians(1) * 6_371_008.8
+    kx = ky * math.cos(math.radians(sum(p.lat for p in points) / len(points)))
+    xy = [(p.lon * kx, p.lat * ky) for p in points]
+
+    def distance(p: tuple[float, float], a: tuple[float, float], b: tuple[float, float]) -> float:
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        if dx == dy == 0:
+            return math.hypot(p[0] - a[0], p[1] - a[1])
+        t = max(0.0, min(1.0, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / (dx * dx + dy * dy)))
+        return math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy)
+
+    keep = {0, len(points) - 1}
+    stack = [(0, len(points) - 1)]
+    while stack:
+        start, end = stack.pop()
+        far = max(
+            range(start + 1, end), key=lambda i: distance(xy[i], xy[start], xy[end]), default=None
+        )
+        if far is not None and distance(xy[far], xy[start], xy[end]) > tolerance_m:
+            keep.add(far)
+            stack.extend(((start, far), (far, end)))
+    return [point for i, point in enumerate(points) if i in keep]
+
+
+@settings(max_examples=200, deadline=None)
+@given(
+    st.lists(
+        st.tuples(st.floats(40.0, 41.0), st.floats(-88.0, -87.0)),
+        min_size=3,
+        max_size=60,
+    ),
+    st.sampled_from([5.0, 30.0, 500.0, 5_000.0]),
+)
+def test_simplify_matches_the_textbook_algorithm(
+    coordinates: list[tuple[float, float]], tolerance_m: float
+) -> None:
+    line = [LatLon(lat, lon) for lat, lon in coordinates]
+
+    assert simplify(line, tolerance_m) == plain_douglas_peucker(line, tolerance_m)
 
 
 class TestFractionNear:
