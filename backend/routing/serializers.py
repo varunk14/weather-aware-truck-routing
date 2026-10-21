@@ -173,12 +173,15 @@ def _level_key(level: RiskLevel) -> str:
 def _notes(plan: RoutePlan) -> list[str]:
     notes = []
     if len(plan.routes) < len(ROUTE_IDS):
-        notes.append(f"Only {len(plan.routes)} distinct truck routes connect these places.")
+        notes.append(
+            f"Only {len(plan.routes)} distinct truck routes were found between these places."
+        )
     detours = [route.route_id for route in plan.routes if route.detour]
     if detours:
         names = " and ".join(f"Route {route_id}" for route_id in detours)
+        one = len(detours) == 1
         notes.append(
-            f"{names} came from routing through a point beside the main route, "
-            "because fewer direct alternatives were available."
+            f"{names} {'goes' if one else 'go'} through a point beside Route "
+            f"{plan.routes[0].route_id}, so {'it uses' if one else 'they use'} different roads."
         )
     return notes

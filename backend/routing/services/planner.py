@@ -7,6 +7,7 @@ Open-Meteo again. Only the simplified geometry is kept, which keeps cached plans
 
 import hashlib
 from collections.abc import Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -103,8 +104,11 @@ class RoutePlan:
 
 
 def plan_trip(client: TomTomClient, weather: OpenMeteoClient, trip: TripRequest) -> RoutePlan:
-    origin = resolve(client, trip.origin)
-    target = resolve(client, trip.destination)
+    # The two places are looked up at the same time.
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        origin_lookup = pool.submit(resolve, client, trip.origin)
+        target_lookup = pool.submit(resolve, client, trip.destination)
+        origin, target = origin_lookup.result(), target_lookup.result()
     if haversine_m(origin.position, target.position) < MIN_TRIP_M:
         raise SamePlaceError("The origin and destination are the same place.")
     # The road is never shorter than the straight line, so this needs no routing request.

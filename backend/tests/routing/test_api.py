@@ -100,6 +100,17 @@ class TestRoutes:
         assert set(first) == {"index", "mile", "lat", "lon", "eta", "weather", "risk"}
         assert datetime.fromisoformat(first["eta"]) == datetime.fromisoformat(route["departure"])
 
+    def test_plans_are_compressed_for_clients_that_accept_it(
+        self, client: Client, api_tomtom: FakeTomTom
+    ) -> None:
+        plain = post(client, trip())
+        zipped = client.post(
+            "/api/routes", data=trip(), content_type="application/json", HTTP_ACCEPT_ENCODING="gzip"
+        )
+
+        assert zipped["Content-Encoding"] == "gzip"
+        assert len(zipped.content) < len(plain.content) / 3
+
     def test_resolves_picked_suggestions(self, client: Client, api_tomtom: FakeTomTom) -> None:
         picked = {"place_id": "FQ7v-lMA6etQH3Bm9hQ7uw", "place_type": "areas"}
 
@@ -120,9 +131,10 @@ class TestRoutes:
     ) -> None:
         body = trip()
         post(client, body)
+        first = len(api_tomtom.requests)
         post(client, body)
 
-        assert api_tomtom.count("route") == 1
+        assert len(api_tomtom.requests) == first
 
     def test_reports_detours_in_the_notes(self, client: Client, api_tomtom: FakeTomTom) -> None:
         recorded = load("route_chicago_milwaukee")
@@ -132,9 +144,8 @@ class TestRoutes:
 
         assert [r["detour"] for r in body["routes"]] == [False, True]
         assert body["notes"] == [
-            "Only 2 distinct truck routes connect these places.",
-            "Route B came from routing through a point beside the main route, "
-            "because fewer direct alternatives were available.",
+            "Only 2 distinct truck routes were found between these places.",
+            "Route B goes through a point beside Route A, so it uses different roads.",
         ]
 
     @pytest.mark.parametrize(
