@@ -7,7 +7,7 @@ import { tripPlan } from "../../test/fixtures";
 import { BASEMAP_STYLE_URL } from "./mapConfig";
 import { boundsOf, checkpointsData, planBounds, routesData } from "./mapData";
 import { LAYERS, SOURCES } from "./mapLayers";
-import MapView from "./MapView";
+import MapView, { CAMERA_SETTLE_MS } from "./MapView";
 
 type Handler = (event: unknown) => void;
 
@@ -89,6 +89,13 @@ function loadMap() {
   });
 }
 
+/** Camera moves wait briefly for the layout (the phone's bottom sheet) to settle. */
+function settle() {
+  act(() => {
+    vi.advanceTimersByTime(CAMERA_SETTLE_MS);
+  });
+}
+
 function click(features: Record<string, unknown[]>) {
   mapInstance.renderedFeatures.clear();
   for (const [layer, found] of Object.entries(features)) {
@@ -104,6 +111,7 @@ function lastData(source: string): unknown {
 }
 
 beforeEach(() => {
+  vi.useFakeTimers();
   vi.clearAllMocks();
   mapInstance.once.clear();
   mapInstance.listeners.length = 0;
@@ -113,6 +121,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -157,39 +166,110 @@ describe("MapView", () => {
 
     expect(lastData(SOURCES.routes)).toEqual(routesData(plan, "A"));
     expect(lastData(SOURCES.checkpoints)).toEqual(checkpointsData(plan.routes[0], null));
+    settle();
     expect(mapInstance.fitBounds).toHaveBeenCalledWith(
       planBounds(plan),
       expect.objectContaining({ maxZoom: 11 }),
     );
   });
 
-  it("frames the route the user selects, and keeps the view for the same plan otherwise", () => {
+  it("only sends the map the data that changed", () => {
+    const plan = tripPlan();
+    const { rerender } = render(<MapView plan={plan} selectedRouteId="A" />);
+    loadMap();
+    const routes = mapInstance.sources.get(SOURCES.routes)?.setData;
+    const endpoints = mapInstance.sources.get(SOURCES.endpoints)?.setData;
+    routes?.mockClear();
+    endpoints?.mockClear();
+
+    rerender(<MapView plan={plan} selectedRouteId="A" selectedCheckpoint={1} />);
+
+    expect(routes).not.toHaveBeenCalled();
+    expect(endpoints).not.toHaveBeenCalled();
+    expect(lastData(SOURCES.checkpoints)).toEqual(checkpointsData(plan.routes[0], 1));
+  });
+
+  it("frames the route the user selects, and eases to a selected checkpoint", () => {
     const plan = tripPlan();
     const { rerender } = render(<MapView plan={plan} selectedRouteId="B" />);
     loadMap();
+    settle();
     mapInstance.fitBounds.mockClear();
 
     rerender(<MapView plan={plan} selectedRouteId="C" />);
+    settle();
     const routeC = plan.routes[2]?.geometry.coordinates ?? [];
     expect(mapInstance.fitBounds).toHaveBeenCalledWith(boundsOf(routeC), expect.anything());
 
     mapInstance.fitBounds.mockClear();
     rerender(<MapView plan={plan} selectedRouteId="C" selectedCheckpoint={1} />);
+    settle();
     expect(mapInstance.fitBounds).not.toHaveBeenCalled();
     expect(mapInstance.easeTo).toHaveBeenCalledWith(
       expect.objectContaining({ center: [-121.5, 46.5], zoom: 7 }),
     );
   });
 
+  it("frames with the padding the layout settles on, not the one it had a moment before", () => {
+    const plan = tripPlan();
+    const high = { top: 32, right: 32, bottom: 600, left: 32 };
+    const low = { top: 32, right: 32, bottom: 230, left: 32 };
+    const { rerender } = render(<MapView plan={plan} selectedRouteId="B" padding={high} />);
+    loadMap();
+    settle();
+    mapInstance.fitBounds.mockClear();
+
+    // Picking a route lowers the sheet: the selection arrives first, the new height just after.
+    rerender(<MapView plan={plan} selectedRouteId="C" padding={high} />);
+    rerender(<MapView plan={plan} selectedRouteId="C" padding={low} />);
+    settle();
+
+    expect(mapInstance.fitBounds).toHaveBeenCalledTimes(1);
+    expect(mapInstance.fitBounds).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ padding: low }),
+    );
+  });
+
+  it("does not move the camera when only the padding changes", () => {
+    const plan = tripPlan();
+    const { rerender } = render(<MapView plan={plan} selectedRouteId="B" />);
+    loadMap();
+    settle();
+    mapInstance.fitBounds.mockClear();
+
+    rerender(
+      <MapView
+        plan={plan}
+        selectedRouteId="B"
+        padding={{ top: 0, right: 0, bottom: 300, left: 0 }}
+      />,
+    );
+    settle();
+
+    expect(mapInstance.fitBounds).not.toHaveBeenCalled();
+  });
+
   it("frames a new plan even when it has the same route ids", () => {
     const { rerender } = render(<MapView plan={tripPlan()} selectedRouteId="B" />);
     loadMap();
+    settle();
     mapInstance.fitBounds.mockClear();
 
     const next: TripPlan = tripPlan({ load_lb: 1 });
     rerender(<MapView plan={next} selectedRouteId="B" />);
+    settle();
 
     expect(mapInstance.fitBounds).toHaveBeenCalledWith(planBounds(next), expect.anything());
+  });
+
+  it("credits the routing and weather data on the map", () => {
+    render(<MapView />);
+
+    const [options] = vi.mocked(MapLibreMap).mock.calls[0] ?? [];
+    expect(options?.attributionControl).toMatchObject({
+      customAttribution: expect.stringMatching(/TomTom.*Open-Meteo/) as unknown,
+    });
   });
 
   it("reports taps on checkpoints first, then on other routes", () => {

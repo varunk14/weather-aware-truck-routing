@@ -28,9 +28,17 @@ setWorkerUrl(workerUrl);
 
 export type MapPadding = PaddingOptions;
 
+type CameraMove = { bounds: LngLatBoundsLike } | { center: [number, number] };
+
 const DEFAULT_PADDING: MapPadding = { top: 48, right: 48, bottom: 48, left: 48 };
 const CAMERA_MS = 600;
 const CHECKPOINT_ZOOM = 7;
+/**
+ * Camera moves wait this long for the layout to settle: picking a route on a phone also lowers
+ * the bottom sheet, and the map must frame the route with the sheet's new height, not the old.
+ */
+export const CAMERA_SETTLE_MS = 60;
+const DATA_ATTRIBUTION = "Routing © TomTom · Weather: Open-Meteo";
 
 interface MapViewProps {
   plan?: TripPlan | null;
@@ -83,9 +91,9 @@ export default function MapView({
   const route = plan ? routeById(plan, selectedRouteId) : undefined;
 
   // The map's event handlers are bound once; they read the latest props through this ref.
-  const latest = useRef({ route, padding, onSelectRoute, onSelectCheckpoint });
+  const latest = useRef({ route, onSelectRoute, onSelectCheckpoint });
   useEffect(() => {
-    latest.current = { route, padding, onSelectRoute, onSelectCheckpoint };
+    latest.current = { route, onSelectRoute, onSelectCheckpoint };
   });
 
   useEffect(() => {
@@ -97,7 +105,8 @@ export default function MapView({
       style: BASEMAP_STYLE_URL,
       bounds: INITIAL_BOUNDS,
       fitBoundsOptions: { padding: 16 },
-      attributionControl: { compact: true },
+      // The data sources are credited on the map itself, so the credit is always on screen.
+      attributionControl: { compact: true, customAttribution: DATA_ATTRIBUTION },
     });
     mapRef.current = map;
     map.addControl(new NavigationControl({ showCompass: false }), "top-left");
@@ -145,51 +154,70 @@ export default function MapView({
     };
   }, [webGLAvailable]);
 
-  // Draw the plan: every route, and the checkpoints of the selected one.
+  // Draw the plan. Each source is only sent to the map when its own data changes.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !loaded) return;
-    setSourceData(map, SOURCES.routes, routesData(plan, selectedRouteId));
-    setSourceData(map, SOURCES.checkpoints, checkpointsData(route, selectedCheckpoint));
-    setSourceData(map, SOURCES.endpoints, endpointsData(plan));
-  }, [loaded, plan, route, selectedRouteId, selectedCheckpoint]);
+    if (map && loaded) setSourceData(map, SOURCES.routes, routesData(plan, selectedRouteId));
+  }, [loaded, plan, selectedRouteId]);
 
-  // Frame all routes when a plan arrives, and the selected route when the user picks another.
-  const framed = useRef<{ plan: TripPlan | null; routeId: string | null }>({
-    plan: null,
-    routeId: null,
-  });
+  useEffect(() => {
+    const map = mapRef.current;
+    if (map && loaded) {
+      setSourceData(map, SOURCES.checkpoints, checkpointsData(route, selectedCheckpoint));
+    }
+  }, [loaded, route, selectedCheckpoint]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (map && loaded) setSourceData(map, SOURCES.endpoints, endpointsData(plan));
+  }, [loaded, plan]);
+
+  // Move the camera: to all routes when a plan arrives, to a route when the user picks another,
+  // to a checkpoint when one is picked. The move is applied once the padding has settled.
+  const framed = useRef<{
+    plan: TripPlan | null;
+    routeId: string | null;
+    checkpoint: number | null;
+  }>({ plan: null, routeId: null, checkpoint: null });
+  const pendingMove = useRef<CameraMove | null>(null);
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !loaded || !plan) return;
     const last = framed.current;
-    framed.current = { plan, routeId: selectedRouteId };
-    let bounds: LngLatBoundsLike | null = null;
-    if (last.plan !== plan) bounds = planBounds(plan);
-    else if (last.routeId !== selectedRouteId && route)
-      bounds = boundsOf(route.geometry.coordinates);
-    if (bounds) {
-      map.fitBounds(bounds, {
-        padding: latest.current.padding,
-        duration: cameraDuration(),
-        maxZoom: 11,
-      });
-    }
-  }, [loaded, plan, route, selectedRouteId]);
-
-  // Bring a checkpoint picked from the list into view.
-  useEffect(() => {
-    const map = mapRef.current;
+    framed.current = { plan, routeId: selectedRouteId, checkpoint: selectedCheckpoint };
     const checkpoint =
       selectedCheckpoint === null ? undefined : route?.checkpoints[selectedCheckpoint];
-    if (!map || !loaded || !checkpoint) return;
-    map.easeTo({
-      center: [checkpoint.lon, checkpoint.lat],
-      zoom: Math.max(map.getZoom(), CHECKPOINT_ZOOM),
-      padding: latest.current.padding,
-      duration: cameraDuration(),
-    });
-  }, [loaded, route, selectedCheckpoint]);
+    if (last.plan !== plan) {
+      const bounds = planBounds(plan);
+      if (bounds) pendingMove.current = { bounds };
+    } else if (last.routeId !== selectedRouteId && route) {
+      const bounds = boundsOf(route.geometry.coordinates);
+      if (bounds) pendingMove.current = { bounds };
+    } else if (last.checkpoint !== selectedCheckpoint && checkpoint) {
+      pendingMove.current = { center: [checkpoint.lon, checkpoint.lat] };
+    }
+    if (!pendingMove.current) return;
+
+    const timer = setTimeout(() => {
+      const move = pendingMove.current;
+      pendingMove.current = null;
+      if (!move) return;
+      const duration = cameraDuration();
+      if ("bounds" in move) {
+        map.fitBounds(move.bounds, { padding, duration, maxZoom: 11 });
+      } else {
+        map.easeTo({
+          center: move.center,
+          zoom: Math.max(map.getZoom(), CHECKPOINT_ZOOM),
+          padding,
+          duration,
+        });
+      }
+    }, CAMERA_SETTLE_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [loaded, plan, route, selectedRouteId, selectedCheckpoint, padding]);
 
   if (!webGLAvailable) {
     return (
