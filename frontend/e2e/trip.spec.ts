@@ -191,6 +191,21 @@ test.describe("on a phone", () => {
     expect(sizes.length).toBeGreaterThan(5);
     for (const size of sizes) expect(size).toBeGreaterThanOrEqual(44);
   });
+
+  test("gives every day and time in the calendar a touch target of at least 44 px", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: /^Departure / }).click();
+    const calendar = page.getByRole("dialog", { name: "Choose the departure" });
+    await expect(calendar).toBeVisible();
+
+    const sizes = await calendar
+      .locator("button")
+      .evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect().height));
+    expect(sizes.length).toBeGreaterThan(30);
+    for (const size of sizes) expect(size).toBeGreaterThanOrEqual(44);
+  });
 });
 
 test("never scrolls sideways once a plan is shown", async ({ page }) => {

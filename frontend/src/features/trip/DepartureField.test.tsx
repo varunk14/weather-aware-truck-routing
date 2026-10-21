@@ -38,7 +38,7 @@ describe("departureBounds", () => {
 });
 
 describe("DepartureField", () => {
-  it("shows the departure and opens a calendar of the allowed days", async () => {
+  it("shows the departure and opens the two weeks that hold the allowed days", async () => {
     const user = userEvent.setup();
     render(<Harness />);
 
@@ -48,6 +48,10 @@ describe("DepartureField", () => {
 
     const calendar = dialog();
     expect(within(calendar).getByText("October 2026")).toBeInTheDocument();
+    const days = within(calendar).getAllByRole("button", { name: /day, / });
+    expect(days).toHaveLength(14);
+    expect(days[0]).toHaveAccessibleName("Sunday, October 18");
+    expect(days[13]).toHaveAccessibleName("Saturday, October 31");
     expect(within(calendar).getByRole("button", { name: "Tuesday, October 20" })).toBeDisabled();
     expect(within(calendar).getByRole("button", { name: "Wednesday, October 28" })).toBeEnabled();
     expect(within(calendar).getByRole("button", { name: "Thursday, October 29" })).toBeDisabled();
@@ -61,7 +65,7 @@ describe("DepartureField", () => {
 
     await user.click(trigger());
     await user.click(within(dialog()).getByRole("button", { name: "Saturday, October 24" }));
-    await user.selectOptions(within(dialog()).getByRole("combobox", { name: "Minutes" }), "30");
+    await user.click(within(dialog()).getByRole("radio", { name: "30 minutes" }));
     expect(onChange).not.toHaveBeenCalled();
     await user.click(within(dialog()).getByRole("button", { name: "Done" }));
 
@@ -123,11 +127,51 @@ describe("DepartureField", () => {
     render(<Harness />);
 
     await user.click(trigger());
-    const hours = within(dialog()).getByRole("combobox", { name: "Hour" });
+    const hours = within(dialog()).getByRole("radiogroup", { name: "Hour" });
 
-    expect(within(hours).getByRole("option", { name: "5" })).toBeDisabled();
-    expect(within(hours).getByRole("option", { name: "6" })).toBeEnabled();
-    expect(within(dialog()).getByRole("button", { name: "AM" })).toBeDisabled();
+    expect(within(hours).getByRole("radio", { name: "5 PM" })).toBeDisabled();
+    expect(within(hours).getByRole("radio", { name: "6 PM" })).toBeEnabled();
+    expect(within(hours).getByRole("radio", { name: "7 PM" })).toBeChecked();
+    expect(within(dialog()).getByRole("radio", { name: "AM" })).toBeDisabled();
+  });
+
+  it("moves the time with the arrow keys, skipping times that have passed", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Harness onChange={onChange} />);
+
+    await user.click(trigger());
+    within(dialog()).getByRole("radio", { name: "7 PM" }).focus();
+    await user.keyboard("{ArrowLeft}{ArrowLeft}");
+    const hours = within(dialog()).getByRole("radiogroup", { name: "Hour" });
+    // 6 PM is the earliest hour left today, so the second press goes nowhere.
+    expect(within(hours).getByRole("radio", { name: "6 PM" })).toBeChecked();
+    expect(within(hours).getByRole("radio", { name: "6 PM" })).toHaveFocus();
+
+    await user.keyboard("{ArrowRight}{ArrowDown}");
+    expect(within(hours).getByRole("radio", { name: "1 PM" })).not.toBeChecked();
+    expect(within(hours).getByRole("radio", { name: "7 PM" })).toBeChecked();
+
+    await user.click(within(dialog()).getByRole("button", { name: "Done" }));
+    expect(onChange).toHaveBeenCalledWith("2026-10-21T19:00");
+  });
+
+  it("names the new month when the two weeks span two", async () => {
+    const user = userEvent.setup();
+    render(
+      <DepartureField
+        value="2026-10-28T09:00"
+        onChange={() => undefined}
+        now={new Date(2026, 9, 28, 8, 0)}
+      />,
+    );
+
+    await user.click(trigger());
+    expect(within(dialog()).getByText(/October\s.\sNovember 2026/)).toBeInTheDocument();
+    expect(within(dialog()).getByRole("button", { name: "Wednesday, November 4" })).toBeEnabled();
+    expect(within(dialog()).getByRole("button", { name: "Sunday, November 1" })).toHaveTextContent(
+      "Nov1",
+    );
   });
 
   it("shows a validation message instead of the hint", () => {
