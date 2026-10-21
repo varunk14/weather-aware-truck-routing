@@ -10,10 +10,8 @@ import type { Interval, LocationInput, TripRequest } from "../../lib/types";
 export const INTERVALS: readonly Interval[] = [10, 25, 50];
 export const MAX_LOAD_LB = 80_000;
 export const MAX_DAYS_AHEAD = 7;
-export const DEPARTURE_GRACE_MS = 15 * 60 * 1000;
+const DEPARTURE_GRACE_MS = 15 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
-/** Departure times are offered every 15 minutes. */
-export const SLOT_MINUTES = 15;
 
 /** What the user typed, plus the suggestion they picked for it, if any. */
 export interface PlaceValue {
@@ -118,46 +116,10 @@ export function apiFieldErrors(fieldErrors: Readonly<Record<string, string>>): D
   return errors;
 }
 
-const WEEKDAY = new Intl.DateTimeFormat(undefined, { weekday: "short" });
-const pad = (value: number) => String(value).padStart(2, "0");
-
-export interface DepartureDay {
-  /** "2026-10-24", the date part of a datetime-local value. */
-  key: string;
-  label: string;
-  date: Date;
-}
-
-/** The local time ``time`` ("19:00") on ``day``. */
-export function atTime(day: Date, time: string): Date {
-  const [hours = 0, minutes = 0] = time.split(":").map(Number);
-  return new Date(day.getFullYear(), day.getMonth(), day.getDate(), hours, minutes);
-}
-
-/** Today and the next seven days: every day a departure is allowed on. */
-export function departureDays(now: Date): DepartureDay[] {
-  return Array.from({ length: MAX_DAYS_AHEAD + 1 }, (_, offset) => {
-    const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
-    const label =
-      offset === 0
-        ? "Today"
-        : offset === 1
-          ? "Tomorrow"
-          : `${WEEKDAY.format(date)} ${String(date.getDate())}`;
-    const key = `${String(date.getFullYear())}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-    return { key, label, date };
-  });
-}
-
-/** The times offered on ``day``: not in the past, and not beyond the seven-day window. */
-export function departureTimes(day: Date, now: Date): string[] {
-  const earliest = now.getTime() - DEPARTURE_GRACE_MS;
-  const latest = now.getTime() + MAX_DAYS_AHEAD * DAY_MS;
-  const times: string[] = [];
-  for (let minutes = 0; minutes < 24 * 60; minutes += SLOT_MINUTES) {
-    const time = `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`;
-    const moment = atTime(day, time).getTime();
-    if (moment >= earliest && moment <= latest) times.push(time);
-  }
-  return times;
+/** The earliest and latest departure allowed, as datetime-local values for the calendar. */
+export function departureWindow(now: Date): { min: string; max: string } {
+  return {
+    min: toDatetimeLocal(new Date(now.getTime() - DEPARTURE_GRACE_MS)),
+    max: toDatetimeLocal(new Date(now.getTime() + MAX_DAYS_AHEAD * DAY_MS)),
+  };
 }
