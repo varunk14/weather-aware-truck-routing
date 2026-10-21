@@ -120,6 +120,14 @@ same hour. A missing value is replaced by the nearest value at most two hours aw
 none, the trip cannot be assessed and the API says so instead of guessing. Gusts are shown for
 context only; the level uses the sustained wind speed.
 
+## 9. The heatmap
+
+Heatmap cells use the same rules as checkpoints: each cell's level for an hour is
+`assess_checkpoint` applied to that cell's wind, rain (with showers) and snow for the hour, with
+the trip's load. A cell's level is never combined with its neighbours', so the map shows the
+true level at each place. The heatmap is for looking ahead; the recommendation comes from the
+checkpoints alone, which use the hour the truck actually reaches them.
+
 ## Trying it
 
 ```bash
@@ -142,4 +150,5 @@ on its own, and each recommendation sentence. Property-based tests (Hypothesis) 
 wind, rain, snow or load never lowers a level, that checkpoint coverage always adds up to the
 route length, and that the recommended route is never worse than another.
 `backend/tests/routing/test_weather.py` covers the hour matching, including arrivals in other
-time zones, and every fallback case.
+time zones, and every fallback case. `backend/tests/routing/test_heatmap.py` covers the corridor
+grid, the frame hours and the heatmap levels with light and heavy loads.

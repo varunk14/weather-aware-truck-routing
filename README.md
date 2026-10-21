@@ -7,9 +7,10 @@ the weather the truck will meet at each checkpoint at its estimated arrival time
 risk from wind, rain, snow and load weight, and recommends the safest route.
 
 > **Status:** in development. In place: the risk engine, truck routing with checkpoints and arrival
-> times, the weather forecast at every checkpoint, and the trip planner interface: a form with place
+> times, the weather forecast at every checkpoint, the trip planner interface (a form with place
 > suggestions, the recommended route, ranked route cards, checkpoint details and the map, with a
-> bottom sheet layout on phones. The weather heatmap and forecast slider come next.
+> bottom sheet layout on phones) and the corridor weather heatmap with its 0 to 48 hour forecast
+> slider and truck marker. Hosting comes next.
 
 ## Tech stack
 
@@ -82,9 +83,12 @@ Weather comes from Open-Meteo, which needs no key.
   US customary everywhere (miles, mph, inches, pounds), as in the specification. Very long trips
   (2,000 miles or more) can take up to about 20 seconds to plan; most trips take 3 to 5.
 - Open-Meteo's free tier allows 10,000 calls a day, counted per location. A cross-country trip
-  needs about 70 locations at 50 mile spacing, 140 at 25 miles and 350 at 10 miles, so the
-  hosted demo handles roughly 70 default trips a day. Repeated trips are served from a
-  15 minute cache.
+  needs about 70 checkpoint locations at 50 mile spacing, 140 at 25 miles and 350 at 10 miles,
+  plus up to 200 heatmap cells, so the hosted demo handles roughly 30 new default trips a day.
+  Repeated trips are served from a 15 minute cache.
+- Heatmap cells grow with the trip, from 20 km on short trips to about 100 km across the
+  country, so local weather on a long trip is averaged over a large square. The checkpoints,
+  which decide the recommendation, are not affected.
 
 ## Project structure
 
@@ -94,7 +98,8 @@ backend/
   routing/           API application: views, URL routes, management commands
   routing/risk/      Risk engine: thresholds, load rules, route scoring and ranking
   routing/clients/   TomTom (suggestions, places, geocoding, truck routing) and Open-Meteo clients
-  routing/services/  Trip planning: places, route options, checkpoints, weather, recommendation
+  routing/services/  Trip planning: places, route options, checkpoints, weather, heatmap,
+                     recommendation
   tests/             pytest suite
 frontend/
   src/app/              Application layout: side panel on wide screens, bottom sheet on phones
@@ -102,6 +107,7 @@ frontend/
   src/features/trip/    Trip form, place suggestions, validation, planning state
   src/features/results/ Recommendation, route cards, risky checkpoints, checkpoint details
   src/features/map/     Map view (MapLibre GL): routes and checkpoints coloured by risk
+  src/features/heatmap/ Corridor heatmap expressions, forecast timeline, truck position
   src/hooks/            React hooks
   src/lib/              API client, types, formatting, risk scale
   src/styles/           Design tokens and global styles

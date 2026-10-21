@@ -127,7 +127,23 @@ risk summary. One route is recommended, with a sentence explaining why.
     "reason": "Fastest route, and no other route has less weather risk.",
     "safe": true
   },
-  "notes": []
+  "notes": [],
+  "heatmap": {
+    "start": "2026-10-21T18:00:00+00:00",
+    "frames": 50,
+    "spacing_m": 20000,
+    "cell_size": { "lat": 0.17966, "lon": 0.24155 },
+    "cells": [
+      {
+        "lat": 41.8705,
+        "lon": -87.6346,
+        "risk": [0, 0, 1, 2, "… one per frame"],
+        "wind": [8.1, 9.4, 26.0, 38.2, "…"],
+        "rain": [0.0, 0.0, 0.02, 0.0, "…"],
+        "snow": [0.0, 0.0, 0.0, 0.0, "…"]
+      }
+    ]
+  }
 }
 ```
 
@@ -147,6 +163,13 @@ risk summary. One route is recommended, with a sentence explaining why.
   when a heavy load raised the wind level.
 - `risk.miles` gives the miles of road at each level (each checkpoint stands for the road halfway
   to its neighbours); `average` is the mile-weighted mean score.
+- `heatmap` is the weather over a corridor around all the routes, for the 0 to 48 hour slider.
+  Frame `i` is the hour `start` plus `i` hours (whole UTC hours from the hour of departure).
+  Each cell is a square `cell_size` degrees across, centred on `lat` and `lon`, with one value
+  per frame: `risk` as a score (0 Low to 4 No Travel, using the trip's load), wind in mph, rain
+  (including showers) and snow in inches per hour. A value is `null` where the forecast had
+  none. `heatmap` is `null` when the corridor weather could not be fetched; the routes are
+  planned regardless.
 - `weather` is the forecast for the hour the truck reaches the checkpoint: wind in mph, rain
   (including showers) and snow in inches per hour. Gusts are shown for context; the risk level
   uses the sustained wind speed.
