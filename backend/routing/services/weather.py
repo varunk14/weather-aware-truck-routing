@@ -119,11 +119,11 @@ def _location_key(position: LatLon) -> LatLon:
     return LatLon(round(position.lat, LOCATION_DECIMALS), round(position.lon, LOCATION_DECIMALS))
 
 
-def _total(
-    forecast: HourlyForecast, hour: datetime, name: str, *series: tuple[Value, ...]
-) -> float:
+def total_near(
+    forecast: HourlyForecast, hour: datetime, *series: tuple[Value, ...]
+) -> float | None:
     """The sum of ``series`` at ``hour``, or at the nearest hour within the fallback window
-    (earlier first) where every one of them has a value."""
+    (earlier first) where every one of them has a value; None if there is no such hour."""
     if forecast.times:
         index = round((hour - forecast.times[0]) / HOUR)
         for offset in _OFFSETS:
@@ -132,9 +132,18 @@ def _total(
                 values = [one[i] for one in series]
                 if None not in values:
                     return sum(value for value in values if value is not None)
-    raise IncompleteForecastError(
-        f"The forecast has no {name} within {FALLBACK_HOURS} hours of {hour.isoformat()}."
-    )
+    return None
+
+
+def _total(
+    forecast: HourlyForecast, hour: datetime, name: str, *series: tuple[Value, ...]
+) -> float:
+    total = total_near(forecast, hour, *series)
+    if total is None:
+        raise IncompleteForecastError(
+            f"The forecast has no {name} within {FALLBACK_HOURS} hours of {hour.isoformat()}."
+        )
+    return total
 
 
 # 0, -1, +1, -2, +2: the requested hour first, then outwards, earlier before later.
