@@ -27,8 +27,13 @@
   background: var(--color-risk-severe);
 }
 
-.badge[data-status="checking"] .dot {
+.badge[data-status="checking"] .dot,
+.badge[data-status="waking"] .dot {
   animation: pulse 1.2s ease-in-out infinite;
+}
+
+.badge[data-status="waking"] .dot {
+  background: var(--color-risk-moderate);
 }
 
 @keyframes pulse {
