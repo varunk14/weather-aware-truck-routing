@@ -11,6 +11,8 @@ export default defineConfig({
   reporter: isCI ? [["github"], ["html", { open: "never" }]] : "list",
   use: {
     baseURL: `http://127.0.0.1:${String(PORT)}`,
+    // The browser formats dates in its own locale; tests pin US English so they pass anywhere.
+    locale: "en-US",
     trace: "retain-on-failure",
   },
   projects: [
