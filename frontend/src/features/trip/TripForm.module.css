@@ -1,0 +1,146 @@
+.form {
+  display: grid;
+  gap: var(--space-4);
+}
+
+/* Origin and destination in one column, with the swap button between them on the right. */
+.places {
+  display: grid;
+  grid-template-areas:
+    "origin swap"
+    "destination swap";
+  grid-template-columns: minmax(0, 1fr) 44px;
+  gap: var(--space-3) var(--space-2);
+}
+
+.places > :nth-child(1) {
+  grid-area: origin;
+}
+
+.places > :nth-child(3) {
+  grid-area: destination;
+}
+
+.swap {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  grid-area: swap;
+  place-items: center;
+  align-self: center;
+  margin-top: var(--space-5);
+  padding: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-2);
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast),
+    color var(--duration-fast);
+}
+
+.swap:hover {
+  border-color: var(--color-text-3);
+  color: var(--color-text);
+}
+
+.swap svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.6;
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.interval {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.segments {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  padding: 3px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+}
+
+.segment {
+  position: relative;
+  display: grid;
+  /* With the track's padding this matches the 44 px inputs beside it. */
+  min-height: 38px;
+  place-items: center;
+  border-radius: 7px;
+  color: var(--color-text-2);
+  cursor: pointer;
+  font-weight: 500;
+  transition:
+    background var(--duration-fast),
+    color var(--duration-fast);
+}
+
+.segment input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.segment:has(input:checked) {
+  background: var(--color-surface);
+  box-shadow: 0 1px 3px rgb(13 30 45 / 12%);
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.segment:has(input:focus-visible) {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+.formError {
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-error-bg);
+  color: var(--color-error);
+}
+
+.submit {
+  min-height: 48px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+  cursor: pointer;
+  font-size: var(--text-lg);
+  font-weight: 600;
+  transition: filter var(--duration-fast);
+}
+
+.submit:hover:not([aria-disabled="true"]) {
+  filter: brightness(1.08);
+}
+
+.submit[aria-disabled="true"] {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+@media (width < 400px) {
+  .pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

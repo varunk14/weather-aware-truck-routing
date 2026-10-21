@@ -11,7 +11,7 @@ from rest_framework.views import APIView
 from config import __version__
 from routing import clients
 from routing.serializers import TripRequestSerializer, plan_to_json
-from routing.services.planner import SamePlaceError, plan_trip
+from routing.services.planner import TripError, plan_trip
 from routing.throttles import RoutesThrottle, SuggestThrottle
 
 SUGGEST_MIN_CHARS = 2
@@ -66,6 +66,6 @@ class RoutesView(APIView):
             plan = plan_trip(
                 clients.tomtom_client(), clients.open_meteo_client(), serializer.to_trip()
             )
-        except SamePlaceError as error:
+        except TripError as error:
             raise serializers.ValidationError({"destination": [str(error)]}) from error
         return Response(plan_to_json(plan))

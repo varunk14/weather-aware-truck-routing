@@ -1,6 +1,7 @@
 import styles from "./EmptyState.module.css";
 
 const RANKING = [
+  "Fewest miles in No Travel conditions",
   "Fewest miles in Severe weather",
   "Fewest miles in High-risk weather",
   "Lowest average risk",
@@ -14,8 +15,9 @@ export function EmptyState() {
         Plan a trip
       </h2>
       <p className={styles.lead}>
-        Enter an origin, destination, departure time and load weight. Clearway compares three routes
-        by the weather the truck will meet at each checkpoint and recommends the safest one.
+        Enter an origin, destination, departure time and load weight. Clearway compares three truck
+        routes by the weather the truck will meet at each checkpoint, at the hour it gets there, and
+        recommends the safest one.
       </p>
       <h3 className={styles.subtitle}>How routes are ranked</h3>
       <ol className={styles.list}>

@@ -8,6 +8,7 @@ from django.utils import timezone
 from routing import clients
 from routing.clients.tomtom import TomTomNotConfiguredError
 from routing.geo import LatLon
+from routing.services import planner
 from routing.throttles import RoutesThrottle, SuggestThrottle
 from tests.routing.conftest import (
     CALM,
@@ -99,6 +100,17 @@ class TestRoutes:
         assert set(first) == {"index", "mile", "lat", "lon", "eta", "weather", "risk"}
         assert datetime.fromisoformat(first["eta"]) == datetime.fromisoformat(route["departure"])
 
+    def test_plans_are_compressed_for_clients_that_accept_it(
+        self, client: Client, api_tomtom: FakeTomTom
+    ) -> None:
+        plain = post(client, trip())
+        zipped = client.post(
+            "/api/routes", data=trip(), content_type="application/json", HTTP_ACCEPT_ENCODING="gzip"
+        )
+
+        assert zipped["Content-Encoding"] == "gzip"
+        assert len(zipped.content) < len(plain.content) / 3
+
     def test_resolves_picked_suggestions(self, client: Client, api_tomtom: FakeTomTom) -> None:
         picked = {"place_id": "FQ7v-lMA6etQH3Bm9hQ7uw", "place_type": "areas"}
 
@@ -119,9 +131,10 @@ class TestRoutes:
     ) -> None:
         body = trip()
         post(client, body)
+        first = len(api_tomtom.requests)
         post(client, body)
 
-        assert api_tomtom.count("route") == 1
+        assert len(api_tomtom.requests) == first
 
     def test_reports_detours_in_the_notes(self, client: Client, api_tomtom: FakeTomTom) -> None:
         recorded = load("route_chicago_milwaukee")
@@ -131,9 +144,8 @@ class TestRoutes:
 
         assert [r["detour"] for r in body["routes"]] == [False, True]
         assert body["notes"] == [
-            "Only 2 distinct truck routes connect these places.",
-            "Route B came from routing through a point beside the main route, "
-            "because fewer direct alternatives were available.",
+            "Only 2 distinct truck routes were found between these places.",
+            "Route B goes through a point beside Route A, so it uses different roads.",
         ]
 
     @pytest.mark.parametrize(
@@ -159,7 +171,7 @@ class TestRoutes:
         assert response.status_code == 400
         assert field in response.json()
 
-    @pytest.mark.parametrize(("delta", "message"), [({"hours": -2}, "now"), ({"days": 8}, "7")])
+    @pytest.mark.parametrize(("delta", "message"), [({"hours": -2}, "now"), ({"days": 10.1}, "10")])
     def test_departure_must_be_within_the_forecast_window(
         self, client: Client, api_tomtom: FakeTomTom, delta: dict[str, float], message: str
     ) -> None:
@@ -167,6 +179,11 @@ class TestRoutes:
 
         assert response.status_code == 400
         assert message in response.json()["departure"][0]
+
+    def test_a_departure_nine_days_ahead_is_accepted(
+        self, client: Client, api_tomtom: FakeTomTom
+    ) -> None:
+        assert post(client, trip(departure=departure(days=9.9))).status_code == 200
 
     def test_a_departure_a_few_minutes_ago_is_accepted(
         self, client: Client, api_tomtom: FakeTomTom
@@ -305,6 +322,38 @@ class TestWeatherRisk:
         post(client, body)
 
         assert len(open_meteo.requests) == 1
+
+
+class TestTripLength:
+    def test_a_trip_longer_than_the_limit_is_refused_before_routing(
+        self, client: Client, api_tomtom: FakeTomTom, open_meteo: FakeOpenMeteo
+    ) -> None:
+        # Chicago to Lisbon: about 4,000 miles in a straight line.
+        response = post(client, trip(destination={"lat": 38.72, "lon": -9.14}))
+
+        assert response.status_code == 400
+        message = response.json()["destination"][0]
+        assert message.startswith("This trip is about 3,9")
+        assert "up to 3,500 mi" in message
+        assert api_tomtom.count("route") == 0
+        assert open_meteo.requests == []
+
+    def test_a_route_longer_than_the_limit_is_refused_before_the_weather_lookup(
+        self,
+        client: Client,
+        api_tomtom: FakeTomTom,
+        open_meteo: FakeOpenMeteo,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        # Chicago to Milwaukee: 81 miles in a straight line, so the first check passes; the
+        # recorded routes are 90 miles and longer, so the road distance is over the limit.
+        monkeypatch.setattr(planner, "MAX_TRIP_MI", 85)
+
+        response = post(client, trip())
+
+        assert response.status_code == 400
+        assert response.json()["destination"][0].startswith("This trip is about 90 mi")
+        assert open_meteo.requests == []
 
 
 class TestErrors:

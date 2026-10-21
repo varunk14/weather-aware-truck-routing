@@ -1,8 +1,9 @@
 """Geometry on the WGS84 sphere: distances, interpolation, simplification and proximity.
 
 Distances use the haversine formula, which is accurate to well under 0.5% at route scale.
-Planar work (simplification, proximity) uses a local equirectangular projection, which is
-adequate for routes within North America.
+Planar work (simplification, proximity) uses a local equirectangular projection around the
+route's mean latitude. That is adequate at route scale anywhere on land; it does not handle
+routes that cross the 180th meridian, which no truck route does.
 """
 
 import math

@@ -1,0 +1,109 @@
+/* Three spin buttons in one bordered field, each with a step up above it and a step down below. */
+.time {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  transition: border-color var(--duration-fast);
+}
+
+.time:focus-within {
+  border-color: var(--color-focus);
+}
+
+.time[data-invalid] {
+  border-color: var(--color-error);
+}
+
+.part {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.part:last-child {
+  margin-left: var(--space-1);
+}
+
+.spinner {
+  display: grid;
+  justify-items: center;
+}
+
+.colon {
+  color: var(--color-text-2);
+  font-size: var(--text-xl);
+  font-weight: 600;
+}
+
+.value {
+  min-width: 44px;
+  padding: 4px 6px;
+  border-radius: 7px;
+  color: var(--color-text);
+  cursor: text;
+  font-size: var(--text-xl);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  line-height: 1.2;
+  outline: none;
+  text-align: center;
+  transition: background var(--duration-fast);
+  user-select: none;
+}
+
+.value:hover {
+  background: var(--color-surface-2);
+}
+
+/* The part being typed into, as in the browser's own time input. */
+.value:focus {
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+}
+
+.step {
+  display: grid;
+  width: 44px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-3);
+  cursor: pointer;
+  place-items: center;
+  transition:
+    background var(--duration-fast),
+    color var(--duration-fast);
+}
+
+.step:hover {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+
+.step svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+/* Touch screens: steps at least 44 px tall. */
+@media (pointer: coarse) {
+  .step {
+    height: 44px;
+  }
+
+  .value {
+    min-height: 44px;
+    padding: 9px 6px;
+  }
+}

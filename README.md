@@ -6,10 +6,10 @@ Weather-aware truck route planner. Clearway compares three routes between two pl
 the weather the truck will meet at each checkpoint at its estimated arrival time, classifies the
 risk from wind, rain, snow and load weight, and recommends the safest route.
 
-> **Status:** in development. In place: the API and web app shell, tooling, CI, the risk engine
-> (thresholds, load rules, route scoring and ranking), truck routing with checkpoints and arrival
-> times, and the weather forecast at every checkpoint with a recommended route. The trip planner
-> interface and the weather heatmap are added in the following milestones.
+> **Status:** in development. In place: the risk engine, truck routing with checkpoints and arrival
+> times, the weather forecast at every checkpoint, and the trip planner interface: a form with place
+> suggestions, the recommended route, ranked route cards, checkpoint details and the map, with a
+> bottom sheet layout on phones. The weather heatmap and forecast slider come next.
 
 ## Tech stack
 
@@ -34,7 +34,7 @@ risk from wind, rain, snow and load weight, and recommends the safest route.
 git clone https://github.com/varunk14/weather-aware-truck-routing.git
 cd weather-aware-truck-routing
 make install
-cp backend/.env.example backend/.env   # optional until the routing milestone
+cp backend/.env.example backend/.env   # then add your TomTom API key
 make dev
 ```
 
@@ -78,6 +78,9 @@ Weather comes from Open-Meteo, which needs no key.
 
 ## Limitations
 
+- Trips can start and end anywhere TomTom has truck routing, up to 3,500 miles apart. Units are
+  US customary everywhere (miles, mph, inches, pounds), as in the specification. Very long trips
+  (2,000 miles or more) can take up to about 20 seconds to plan; most trips take 3 to 5.
 - Open-Meteo's free tier allows 10,000 calls a day, counted per location. A cross-country trip
   needs about 70 locations at 50 mile spacing, 140 at 25 miles and 350 at 10 miles, so the
   hosted demo handles roughly 70 default trips a day. Repeated trips are served from a
@@ -94,13 +97,15 @@ backend/
   routing/services/  Trip planning: places, route options, checkpoints, weather, recommendation
   tests/             pytest suite
 frontend/
-  src/app/           Application shell and layout
-  src/components/    Shared interface components
-  src/features/map/  Map view (MapLibre GL)
-  src/hooks/         React hooks
-  src/lib/           API client
-  src/styles/        Design tokens and global styles
-  e2e/               Playwright end-to-end tests
+  src/app/              Application layout: side panel on wide screens, bottom sheet on phones
+  src/components/       Shared interface components (header, bottom sheet, attribution)
+  src/features/trip/    Trip form, place suggestions, validation, planning state
+  src/features/results/ Recommendation, route cards, risky checkpoints, checkpoint details
+  src/features/map/     Map view (MapLibre GL): routes and checkpoints coloured by risk
+  src/hooks/            React hooks
+  src/lib/              API client, types, formatting, risk scale
+  src/styles/           Design tokens and global styles
+  e2e/                  Playwright end-to-end tests (desktop and phone)
 docs/
   decisions.md       How the specification was interpreted, and why
   risk-model.md      Risk levels, route scoring and ranking, with examples

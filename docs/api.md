@@ -17,8 +17,7 @@ Liveness check used by the hosting platform, the uptime monitor and the web app.
 
 ## `GET /api/places/suggest?q=…`
 
-Place suggestions while the user types an origin or destination. Results are limited to the
-United States, Canada and Mexico.
+Place suggestions while the user types an origin or destination, anywhere in the world.
 
 | Parameter | Rules                                                                             |
 | --------- | --------------------------------------------------------------------------------- |
@@ -58,12 +57,12 @@ risk summary. One route is recommended, with a sentence explaining why.
 }
 ```
 
-| Field                   | Rules                                                                                                                                                  |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `origin`, `destination` | Exactly one form: a picked suggestion (`place_id` + `place_type`), coordinates (`lat` + `lon`), or free text (`query`). They must be different places. |
-| `departure`             | ISO 8601. From 15 minutes ago up to 7 days ahead. A time without an offset is read as UTC.                                                             |
-| `load_lb`               | Whole pounds, 1 to 80,000.                                                                                                                             |
-| `interval_mi`           | Checkpoint spacing: 10, 25 or 50. Default 25.                                                                                                          |
+| Field                   | Rules                                                                                                                                                                                  |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `origin`, `destination` | Exactly one form: a picked suggestion (`place_id` + `place_type`), coordinates (`lat` + `lon`), or free text (`query`). They must be different places, at most 3,500 mi apart by road. |
+| `departure`             | ISO 8601. From 15 minutes ago up to 10 days ahead. A time without an offset is read as UTC.                                                                                            |
+| `load_lb`               | Whole pounds, 1 to 80,000.                                                                                                                                                             |
+| `interval_mi`           | Checkpoint spacing: 10, 25 or 50. Default 25.                                                                                                                                          |
 
 ### Response
 
@@ -137,9 +136,9 @@ risk summary. One route is recommended, with a sentence explaining why.
   destination's. They are exact instants and can be converted freely.
 - `geometry` is simplified for drawing (every removed point lies within 30 m of the line).
   Checkpoints are placed on the full-detail route.
-- `detour: true` marks a route found by routing through a point beside the main route, used when
-  TomTom offers fewer than three alternatives. `notes` explains this, and says so when fewer than
-  three distinct routes exist.
+- `detour: true` marks a route found by routing through a point beside the fastest route. Detours
+  complete the set when TomTom's own alternatives are slow or too few; `notes` says which routes
+  are detours, and says so when fewer than three distinct routes were found.
 - `rank` orders the routes from safest (1) by the rules in the risk model; the route ranked 1 is
   the one in `recommendation`. `safe: false` means every route, including the recommended one,
   crosses No Travel conditions.
@@ -154,13 +153,13 @@ risk summary. One route is recommended, with a sentence explaining why.
 
 ### Errors
 
-| Status | When                                                                                      |
-| ------ | ----------------------------------------------------------------------------------------- |
-| 400    | The request is invalid; the body names each field and the reason.                         |
-| 422    | A place cannot be found, or no truck route connects the places.                           |
-| 429    | Too many requests from this client; retry after the `Retry-After` header.                 |
-| 502    | TomTom or Open-Meteo returned a response the API could not use, or the forecast has gaps. |
-| 503    | TomTom or Open-Meteo is not responding or is rate limiting, or routing is not configured. |
+| Status | When                                                                                                   |
+| ------ | ------------------------------------------------------------------------------------------------------ |
+| 400    | The request is invalid, or the trip is longer than 3,500 mi; the body names each field and the reason. |
+| 422    | A place cannot be found, or no truck route connects the places.                                        |
+| 429    | Too many requests from this client; retry after the `Retry-After` header.                              |
+| 502    | TomTom or Open-Meteo returned a response the API could not use, or the forecast has gaps.              |
+| 503    | TomTom or Open-Meteo is not responding or is rate limiting, or routing is not configured.              |
 
 Error bodies have a `detail` message, for example
 `{"detail": "No truck route connects these places."}`.

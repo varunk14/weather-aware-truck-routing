@@ -21,7 +21,9 @@ from routing.services.planner import (
 INTERVALS_MI = (10, 25, 50)
 DEFAULT_INTERVAL_MI = 25
 MAX_LOAD_LB = 80_000
-MAX_DAYS_AHEAD = 7
+# Open-Meteo forecasts 16 days ahead. Ten days leaves room for the longest trip (3,500 miles,
+# about three days of driving) and the 48 hour heatmap inside the forecast.
+MAX_DAYS_AHEAD = 10
 # A departure a few minutes in the past is accepted, so "leave now" survives a slow form.
 DEPARTURE_GRACE = timedelta(minutes=15)
 
@@ -173,12 +175,15 @@ def _level_key(level: RiskLevel) -> str:
 def _notes(plan: RoutePlan) -> list[str]:
     notes = []
     if len(plan.routes) < len(ROUTE_IDS):
-        notes.append(f"Only {len(plan.routes)} distinct truck routes connect these places.")
+        notes.append(
+            f"Only {len(plan.routes)} distinct truck routes were found between these places."
+        )
     detours = [route.route_id for route in plan.routes if route.detour]
     if detours:
         names = " and ".join(f"Route {route_id}" for route_id in detours)
+        one = len(detours) == 1
         notes.append(
-            f"{names} came from routing through a point beside the main route, "
-            "because fewer direct alternatives were available."
+            f"{names} {'goes' if one else 'go'} through a point beside Route "
+            f"{plan.routes[0].route_id}, so {'it uses' if one else 'they use'} different roads."
         )
     return notes

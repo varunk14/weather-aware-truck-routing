@@ -19,6 +19,9 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    # Trip plans are about 100 KB of JSON (mostly route lines); gzip makes them about a fifth.
+    # The API sets no cookies and returns no secrets, so compression leaks nothing.
+    "django.middleware.gzip.GZipMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",

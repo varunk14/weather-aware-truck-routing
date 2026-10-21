@@ -68,9 +68,12 @@ individually to explain it.
 
 All times are handled in UTC and shown in the origin's local time with the time zone labelled.
 
-### 13. Departure within the next seven days
+### 13. Departure within the next ten days
 
-This keeps the whole trip and the 48 hour heatmap inside the forecast range.
+Open-Meteo forecasts 16 days ahead. Ten days leaves room for the longest trip allowed (3,500
+miles, about three days of driving) and the 48 hour heatmap, so every checkpoint has a forecast.
+Hourly forecasts more than about a week ahead are much less certain, so the form says so when
+the departure is that far out.
 
 ### 14. Load weight between 1 and 80,000 lb
 
@@ -102,12 +105,18 @@ departure instead of presenting that route as safe.
 TomTom's truck travel mode takes the vehicle weight into account, returns up to five alternative
 routes, and the same account covers geocoding and address suggestions.
 
-### 20. Always three routes
+### 20. Three routes, in a few seconds
 
-TomTom may return fewer alternatives than requested when no sensible ones exist. Extra routes are
-then requested through a point offset to either side of the main route's midpoint, and kept only
-if less than 90% of their length runs within 2 km of a route already found. These routes are
-marked as detours, and the response notes when fewer than three distinct routes exist.
+TomTom's own alternative routes take six to eleven seconds to compute for trips of a few hundred
+miles or more, and fail on very long trips, while a single fastest route takes one to two
+seconds. The fastest route and TomTom's alternatives are therefore requested together, and as
+soon as the fastest route arrives, two more are requested through points offset to either side
+of its middle (detours). TomTom's own alternatives are used if they arrive within four seconds;
+after that, whichever complete set of three is ready first is used. A detour is kept only if
+less than 90% of its length runs within 2 km of a route already found, and is marked as a detour
+in the response. Nothing waits longer than 20 seconds; the response notes when fewer than three
+distinct routes were found. Measured: Dallas to Houston 2.7 s, Chicago to Denver 4.3 s, Paris to
+Madrid 6.7 s, Lisbon to Moscow 18 s (it used to fail).
 
 ### 21. Open-Meteo for weather
 
@@ -142,10 +151,14 @@ TomTom reports road distance and travel time (including historic traffic for the
 at points along each route. Checkpoint arrival times are interpolated between those points rather
 than assuming a constant speed, so slow urban stretches are reflected.
 
-### 28. Place suggestions are limited to North America
+### 28. Places anywhere, trips up to 3,500 miles
 
-Suggestions cover the United States, Canada and Mexico, so typing "Paris" offers Paris, TX before
-Paris, France.
+The specification names no region, so places can be anywhere TomTom has truck routing: the
+United States, Canada, Europe, Australia, India and most other regions. Distances, speeds and
+weights stay in the specification's US units everywhere. A trip may be at most 3,500 miles (US
+coast to coast is about 2,800): longer trips would need thousands of forecast locations and
+could run past the 16 day forecast. The limit is checked first on the straight-line distance,
+so a trip across an ocean is refused without a routing request, and then on the shortest route.
 
 ### 29. The map receives a simplified route line
 
@@ -160,7 +173,7 @@ Identical trips are cached for 15 minutes and place lookups for a day. Each clie
 ### 31. A departure a few minutes in the past is accepted
 
 The routing API itself accepts any past departure, so the API enforces the window: from 15
-minutes ago, so a form filled in at "now" is not rejected, up to 7 days ahead.
+minutes ago, so a form filled in at "now" is not rejected, up to 10 days ahead.
 
 ### 32. Weather for the hour the truck arrives
 
@@ -217,6 +230,42 @@ overstate risk where samples cluster.
 ### 40. Built for phones as well as desktops
 
 Every screen works on phones from 360 px wide as well as on tablets and desktops: no horizontal
-scrolling, touch-sized controls, inputs large enough to avoid zoom on focus, and respect for the
-notch and home-indicator areas. On phones the header stays at the top and the map sits above the
-panel. The end-to-end tests run on a desktop and a mobile device profile.
+scrolling, touch targets of at least 44 px, inputs large enough to avoid zoom on focus, and respect
+for the notch and home-indicator areas. The end-to-end tests run on a desktop and a mobile device
+profile.
+
+### 41. A bottom sheet on phones
+
+On phones the map fills the screen and the trip sits in a sheet over it, as in map apps. The sheet
+has three positions: a peek with the trip summary and the recommendation, half height with the
+route cards, and full height with everything, including the trip form. Its handle is a button
+(tap to cycle, arrow keys to step) and it can also be dragged. Picking a route or a checkpoint
+lowers the sheet so the map shows it. Wider screens keep the side panel.
+
+### 42. Everything on the map is also in the panel
+
+Each route card gives distance, time, arrival and the miles at each risk level in numbers, and the
+selected route lists its checkpoints above Low risk. Picking one opens the same details as tapping
+it on the map, so the result can be read without the map, with a keyboard or a screen reader.
+
+### 43. Times are shown where they happen
+
+Departure and checkpoint arrival times are shown in the origin's local time and arrival at the
+destination in the destination's, each with its UTC offset, rather than in the viewer's time zone.
+The departure is entered in the viewer's own time, which the form says.
+
+### 44. Waiting is explained
+
+A plan takes about three to five seconds, mostly for routing, and up to 20 for very long trips. The panel says what is happening, counts
+the seconds, says so if a service is slow, and can be cancelled. A cancelled request leaves the
+previous plan on screen.
+
+### 45. A calendar for the departure
+
+The browser's own date picker cannot be styled and, on desktops, has no confirm button. The form
+uses its own picker, laid out like the browser's: a month calendar, with arrows to the next
+month, in which only the allowed days (now to ten days ahead) can be chosen, and a time typed or
+stepped like the browser's time input. The hour, minutes and AM or PM each take typed digits and
+the up and down arrows, with buttons above and below for a mouse or a finger. Any minute can be
+chosen. A time that has passed is marked and Done waits until it is fixed. The departure changes
+only on Done; Cancel, Escape or a click outside leave it as it was.

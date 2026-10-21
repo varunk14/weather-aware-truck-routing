@@ -7,6 +7,7 @@ Open-Meteo again. Only the simplified geometry is kept, which keeps cached plans
 
 import hashlib
 from collections.abc import Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -33,11 +34,28 @@ from routing.services.weather import Stop, Weather, weather_at_stops
 GEOMETRY_TOLERANCE_M = 30
 PLAN_CACHE_S = 15 * 60
 MIN_TRIP_M = 1_000
+# The longest trip planned. US coast to coast is about 2,800 miles; longer trips would need
+# thousands of forecast locations and could run past the 16 day forecast.
+MAX_TRIP_MI = 3_500
 ROUTE_IDS = ("A", "B", "C")
 
 
-class SamePlaceError(ValueError):
+class TripError(ValueError):
+    """The trip cannot be planned as asked; the message says why, for the destination field."""
+
+
+class SamePlaceError(TripError):
     """The origin and destination resolve to (nearly) the same point."""
+
+
+class TripTooLongError(TripError):
+    """Even the shortest way between the places is longer than ``MAX_TRIP_MI``."""
+
+    def __init__(self, miles: float) -> None:
+        super().__init__(
+            f"This trip is about {miles:,.0f} mi; Clearway plans trips of up to "
+            f"{MAX_TRIP_MI:,} mi. Split it into shorter legs."
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,10 +104,17 @@ class RoutePlan:
 
 
 def plan_trip(client: TomTomClient, weather: OpenMeteoClient, trip: TripRequest) -> RoutePlan:
-    origin = resolve(client, trip.origin)
-    target = resolve(client, trip.destination)
+    # The two places are looked up at the same time.
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        origin_lookup = pool.submit(resolve, client, trip.origin)
+        target_lookup = pool.submit(resolve, client, trip.destination)
+        origin, target = origin_lookup.result(), target_lookup.result()
     if haversine_m(origin.position, target.position) < MIN_TRIP_M:
         raise SamePlaceError("The origin and destination are the same place.")
+    # The road is never shorter than the straight line, so this needs no routing request.
+    straight_mi = haversine_m(origin.position, target.position) / METERS_PER_MILE
+    if straight_mi > MAX_TRIP_MI:
+        raise TripTooLongError(straight_mi)
 
     key = _cache_key(origin, target, trip)
     plan: RoutePlan | None = cache.get(key)
@@ -109,6 +134,9 @@ def _build_plan(
     options = find_route_options(
         client, origin.position, target.position, depart_at=trip.departure, load_lb=trip.load_lb
     )
+    shortest_mi = min(option.route.length_m for option in options) / METERS_PER_MILE
+    if shortest_mi > MAX_TRIP_MI:
+        raise TripTooLongError(shortest_mi)
     named = list(zip(ROUTE_IDS, options, strict=False))
     checkpoints = [place_checkpoints(option.route, trip.interval_mi) for _, option in named]
 
