@@ -171,7 +171,7 @@ class TestRoutes:
         assert response.status_code == 400
         assert field in response.json()
 
-    @pytest.mark.parametrize(("delta", "message"), [({"hours": -2}, "now"), ({"days": 8}, "7")])
+    @pytest.mark.parametrize(("delta", "message"), [({"hours": -2}, "now"), ({"days": 10.1}, "10")])
     def test_departure_must_be_within_the_forecast_window(
         self, client: Client, api_tomtom: FakeTomTom, delta: dict[str, float], message: str
     ) -> None:
@@ -179,6 +179,11 @@ class TestRoutes:
 
         assert response.status_code == 400
         assert message in response.json()["departure"][0]
+
+    def test_a_departure_nine_days_ahead_is_accepted(
+        self, client: Client, api_tomtom: FakeTomTom
+    ) -> None:
+        assert post(client, trip(departure=departure(days=9.9))).status_code == 200
 
     def test_a_departure_a_few_minutes_ago_is_accepted(
         self, client: Client, api_tomtom: FakeTomTom

@@ -21,7 +21,9 @@ from routing.services.planner import (
 INTERVALS_MI = (10, 25, 50)
 DEFAULT_INTERVAL_MI = 25
 MAX_LOAD_LB = 80_000
-MAX_DAYS_AHEAD = 7
+# Open-Meteo forecasts 16 days ahead. Ten days leaves room for the longest trip (3,500 miles,
+# about three days of driving) and the 48 hour heatmap inside the forecast.
+MAX_DAYS_AHEAD = 10
 # A departure a few minutes in the past is accepted, so "leave now" survives a slow form.
 DEPARTURE_GRACE = timedelta(minutes=15)
 
