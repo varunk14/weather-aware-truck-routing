@@ -1,0 +1,26 @@
+name: Keep the API warm
+
+# The free API instance sleeps after 15 minutes without requests and takes about a minute to
+# wake. Calling its health endpoint every 10 minutes keeps it awake for visitors. Set the
+# repository variable API_HEALTH_URL (for example https://clearway-api.onrender.com/api/health)
+# to turn this on; without it the job is skipped.
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    name: Ping the health endpoint
+    if: vars.API_HEALTH_URL != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call the health endpoint
+        env:
+          URL: ${{ vars.API_HEALTH_URL }}
+        # A sleeping instance can take a minute to answer the first call.
+        run: curl --fail --silent --show-error --max-time 120 --retry 2 --retry-delay 10 "$URL"
