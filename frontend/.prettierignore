@@ -3,3 +3,5 @@ coverage
 playwright-report
 test-results
 pnpm-lock.yaml
+# Recorded API responses, kept byte for byte
+e2e/fixtures
