@@ -1,0 +1,73 @@
+# Render Blueprint: the API as a web service and the web app as a static site, both free.
+# Create both from the Render Dashboard (New > Blueprint, pick this repository). Render asks
+# for TOMTOM_API_KEY; everything else is set here or generated.
+
+services:
+  - type: web
+    name: clearway-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    # uv is used because backend/uv.lock exists; development tools are left out.
+    buildCommand: uv sync --locked --no-dev
+    startCommand: .venv/bin/gunicorn config.wsgi:application -c gunicorn.conf.py
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.13
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.prod
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: TOMTOM_API_KEY
+        sync: false
+      # The web app's address, the only origin allowed to call the API from a browser.
+      - key: CORS_ALLOWED_ORIGINS
+        fromService:
+          name: clearway
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+
+  - type: web
+    name: clearway
+    runtime: static
+    rootDir: frontend
+    buildCommand: corepack pnpm install --frozen-lockfile && corepack pnpm build
+    staticPublishPath: dist
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: COREPACK_ENABLE_DOWNLOAD_PROMPT
+        value: "0"
+      # Read at build time: the web app calls the API at this address.
+      - key: VITE_API_BASE_URL
+        fromService:
+          name: clearway-api
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+    headers:
+      # File names under /assets carry a content hash, so they can be cached for good; the
+      # page itself is checked on every visit, so a new deploy shows at once.
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      - path: /
+        name: Cache-Control
+        value: no-cache
+      - path: /index.html
+        name: Cache-Control
+        value: no-cache
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+    routes:
+      # One page: any other path shows the app.
+      - type: rewrite
+        source: /*
+        destination: /index.html

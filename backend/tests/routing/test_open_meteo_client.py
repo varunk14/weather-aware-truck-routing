@@ -10,6 +10,7 @@ from routing.clients.open_meteo import (
     MAX_POINTS_PER_REQUEST,
     OpenMeteoClient,
     WeatherError,
+    WeatherLimitError,
     WeatherUnavailableError,
 )
 from routing.geo import LatLon
@@ -256,6 +257,15 @@ class TestFailures:
     def test_rate_limiting_is_not_retried(self, open_meteo: FakeOpenMeteo) -> None:
         open_meteo.respond(429, {"error": True, "reason": "Too many requests"})
 
-        with pytest.raises(WeatherUnavailableError, match="rate limiting"):
+        with pytest.raises(WeatherLimitError, match="rate limiting") as raised:
             open_meteo.client().hourly([CHICAGO], START, END)
         assert len(open_meteo.requests) == 1
+        assert raised.value.daily is False
+
+    def test_the_daily_limit_is_told_apart(self, open_meteo: FakeOpenMeteo) -> None:
+        reason = "Daily API request limit exceeded. Please try again tomorrow."
+        open_meteo.respond(429, {"error": True, "reason": reason})
+
+        with pytest.raises(WeatherLimitError) as raised:
+            open_meteo.client().hourly([CHICAGO], START, END)
+        assert raised.value.daily is True

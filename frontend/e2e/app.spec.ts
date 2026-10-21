@@ -35,6 +35,16 @@ test.describe("application shell", () => {
 
     await page.goto("/");
 
-    await expect(page.getByRole("status")).toHaveText("API unavailable, retrying");
+    // A sleeping hosted API takes about a minute to wake, so failures at first mean that.
+    const status = page.getByRole("status");
+    await expect(status).toHaveText("API starting up, about a minute");
+
+    // The longer message still fits beside the brand on the narrowest phones.
+    await page.setViewportSize({ width: 360, height: 780 });
+    const box = await status.boundingBox();
+    expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(360);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      360,
+    );
   });
 });

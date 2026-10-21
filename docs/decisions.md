@@ -140,8 +140,13 @@ returned without a heatmap and the timeline says so.
 
 ### 25. Hosting
 
-The web app is served as a static site and the API as a separate web service. An uptime monitor
-calls the health endpoint so the API stays responsive.
+The web app is served as a static site and the API as a separate web service, both on Render's
+free plan (`render.yaml`). The web app calls the API directly, which allows only the web app's
+origin; a rewrite through the static site was not used, so a long plan never depends on a
+proxy's time limit. A free API instance sleeps after 15 minutes idle, so a scheduled GitHub
+Actions job calls the health endpoint every 10 minutes, which stays inside the free 750
+instance hours a month. The API runs as one Gunicorn process with threads, so every request
+shares the in-memory cache.
 
 ### 26. Django 5.2 LTS without a database
 
@@ -170,7 +175,7 @@ the road (a few hundred points); checkpoints are placed on the full-detail route
 
 ### 30. Caching and rate limits protect the routing quota
 
-Identical trips are cached for 15 minutes and place lookups for a day. Each client is limited to
+Identical trips are cached for an hour and place lookups for a day. Each client is limited to
 60 suggestion and 10 route requests per minute.
 
 ### 31. A departure a few minutes in the past is accepted
@@ -198,13 +203,16 @@ batches are fetched in parallel with a 10 second timeout each.
 
 ### 34. The weather quota
 
-Open-Meteo's free tier allows 600 calls a minute, 5,000 an hour and 10,000 a day; Clearway counts
-each location as one call. Chicago to Denver needs 71 checkpoint locations at 50 mile spacing,
-141 at 25 miles and 351 at 10 miles, and the heatmap adds at most 200 cells, so the daily limit
-covers about 30 new trips at the default spacing, and the hourly limit about 15. Plans and the corridor's forecast are cached
-for 15 minutes, so a re-plan of the same trip with another load or spacing fetches only the
-checkpoints, and if Open-Meteo starts rate limiting, the API says the weather service is busy
-instead of failing silently.
+Open-Meteo's free tier allows 600 calls a minute, 5,000 an hour and 10,000 a day, and each
+forecast location counts as one call. Chicago to Denver needs 71 checkpoint locations at 50 mile
+spacing, 141 at 25 miles and 351 at 10 miles, and the heatmap adds at most 200 cells, so the
+daily limit covers about 30 new trips at the default spacing and the hourly limit about 15.
+Plans and the corridor's forecast are cached for an hour, as long as an hourly forecast stays
+current, so repeating a trip costs nothing and a re-plan with another load or spacing fetches
+only the checkpoints. When Open-Meteo refuses a request, the API says which limit was reached:
+busy for a minute, or the daily limit until midnight UTC. The free plan counts calls per server
+address, which a hosting platform may share with other apps; a paid Open-Meteo plan removes the
+limit if the demo ever needs it.
 
 ### 35. Machine-readable risk levels
 

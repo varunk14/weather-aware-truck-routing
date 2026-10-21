@@ -36,10 +36,30 @@ describe("useApiStatus", () => {
     expect(getHealthMock).toHaveBeenCalledTimes(1);
   });
 
+  it("says the API is starting up while it fails or answers slowly at first", async () => {
+    getHealthMock.mockReturnValueOnce(new Promise(() => undefined)).mockResolvedValue(healthy);
+    const { result } = renderHook(() => useApiStatus(1_000));
+
+    await flush(3_900);
+    expect(result.current).toBe("checking");
+    await flush(200);
+    expect(result.current).toBe("waking");
+  });
+
+  it("keeps saying starting up for failures inside the wake window, then offline", async () => {
+    getHealthMock.mockRejectedValue(new Error("unreachable"));
+    const { result } = renderHook(() => useApiStatus(1_000, 10_000));
+
+    await flush();
+    expect(result.current).toBe("waking");
+    await flush(11_000);
+    expect(result.current).toBe("offline");
+  });
+
   it("reports offline and retries until the API answers", async () => {
     getHealthMock.mockRejectedValueOnce(new Error("unreachable")).mockResolvedValue(healthy);
 
-    const { result } = renderHook(() => useApiStatus(1_000));
+    const { result } = renderHook(() => useApiStatus(1_000, 0));
 
     await flush();
     expect(result.current).toBe("offline");

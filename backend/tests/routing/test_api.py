@@ -483,10 +483,32 @@ class TestErrors:
         assert response.status_code == 503
         assert response.json() == {"detail": "Routing is not configured on the server."}
 
+    @pytest.mark.parametrize(
+        ("reason", "detail"),
+        [
+            ("Minutely API request limit exceeded.", "The weather service is busy."),
+            ("Daily API request limit exceeded. Please try again tomorrow.", "daily limit"),
+        ],
+    )
+    def test_weather_limits_are_explained(
+        self,
+        client: Client,
+        api_tomtom: FakeTomTom,
+        open_meteo: FakeOpenMeteo,
+        reason: str,
+        detail: str,
+    ) -> None:
+        open_meteo.respond(429, {"error": True, "reason": reason})
+
+        response = post(client, trip())
+
+        assert response.status_code == 503
+        assert detail in response.json()["detail"]
+
     def test_weather_unavailable(
         self, client: Client, api_tomtom: FakeTomTom, open_meteo: FakeOpenMeteo
     ) -> None:
-        open_meteo.respond(429, {"error": True, "reason": "Too many requests"})
+        open_meteo.respond(500)
 
         response = post(client, trip())
 

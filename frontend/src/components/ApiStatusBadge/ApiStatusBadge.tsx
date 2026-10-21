@@ -3,6 +3,7 @@ import styles from "./ApiStatusBadge.module.css";
 
 const LABELS: Record<ApiStatus, string> = {
   checking: "Connecting to API",
+  waking: "API starting up, about a minute",
   online: "API online",
   offline: "API unavailable, retrying",
 };

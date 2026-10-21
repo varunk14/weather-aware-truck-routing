@@ -6,11 +6,10 @@ Weather-aware truck route planner. Clearway compares three routes between two pl
 the weather the truck will meet at each checkpoint at its estimated arrival time, classifies the
 risk from wind, rain, snow and load weight, and recommends the safest route.
 
-> **Status:** in development. In place: the risk engine, truck routing with checkpoints and arrival
-> times, the weather forecast at every checkpoint, the trip planner interface (a form with place
-> suggestions, the recommended route, ranked route cards, checkpoint details and the map, with a
-> bottom sheet layout on phones) and the corridor weather heatmap with its 0 to 48 hour forecast
-> slider and truck marker. Hosting comes next.
+> **Status:** feature complete: the risk engine, truck routing with checkpoints and arrival times,
+> the weather forecast at every checkpoint, the trip planner interface (with a bottom sheet layout
+> on phones) and the corridor weather heatmap with its 0 to 48 hour forecast slider and truck
+> marker. Hosting on Render is configured in [`render.yaml`](render.yaml).
 
 ## Tech stack
 
@@ -54,6 +53,20 @@ Open http://localhost:5173. The web app proxies `/api` to the API on http://127.
 | `make check`   | Run every check that CI runs                 |
 | `make build`   | Build the web app for production             |
 
+## Hosting
+
+Both parts run on [Render](https://render.com)'s free plan, described in
+[`render.yaml`](render.yaml): the web app as a static site and the API as a web service.
+
+1. In the Render Dashboard choose **New > Blueprint** and pick this repository.
+2. Enter `TOMTOM_API_KEY` when asked. The Django secret key is generated, and each service gets
+   the other's address (for the API's allowed origin and the web app's API address) from Render.
+3. To keep the free API awake, add a repository variable `API_HEALTH_URL` with the API's
+   health address (for example `https://clearway-api.onrender.com/api/health`); the
+   `keep-warm` workflow then calls it every 10 minutes.
+
+A free instance that has slept takes about a minute to wake; the web app says so meanwhile.
+
 ## Risk rules
 
 The risk engine classifies a checkpoint from its wind, rain, snow and the load weight. Try it:
@@ -85,7 +98,7 @@ Weather comes from Open-Meteo, which needs no key.
 - Open-Meteo's free tier allows 10,000 calls a day, counted per location. A cross-country trip
   needs about 70 checkpoint locations at 50 mile spacing, 140 at 25 miles and 350 at 10 miles,
   plus up to 200 heatmap cells, so the hosted demo handles roughly 30 new default trips a day.
-  Repeated trips are served from a 15 minute cache.
+  Repeated trips are served from a one hour cache.
 - Heatmap cells grow with the trip, from 20 km on short trips to about 100 km across the
   country, so local weather on a long trip is averaged over a large square. The checkpoints,
   which decide the recommendation, are not affected.
@@ -93,8 +106,10 @@ Weather comes from Open-Meteo, which needs no key.
 ## Project structure
 
 ```
+render.yaml          Render Blueprint: the API web service and the static web app
 backend/
   config/            Django project: settings (base, dev, prod, test), URLs, WSGI
+  gunicorn.conf.py   Production server settings
   routing/           API application: views, URL routes, management commands
   routing/risk/      Risk engine: thresholds, load rules, route scoring and ranking
   routing/clients/   TomTom (suggestions, places, geocoding, truck routing) and Open-Meteo clients
@@ -113,6 +128,7 @@ frontend/
   src/styles/           Design tokens and global styles
   e2e/                  Playwright end-to-end tests (desktop and phone)
 docs/
+  architecture.md    How the API and web app fit together, and how they are hosted
   decisions.md       How the specification was interpreted, and why
   risk-model.md      Risk levels, route scoring and ranking, with examples
   api.md             API endpoints, request and response formats, errors
@@ -120,6 +136,7 @@ docs/
 
 ## Documentation
 
+- [Architecture](docs/architecture.md): how the API and the web app are built and hosted.
 - [API](docs/api.md): endpoints, request and response formats, validation and errors.
 - [Risk model](docs/risk-model.md): how weather and load become risk levels, and how routes are ranked.
 - [Design decisions](docs/decisions.md): interpretation of the specification and technical choices.

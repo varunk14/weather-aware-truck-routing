@@ -7,6 +7,7 @@ import { ApiStatusBadge } from "./ApiStatusBadge";
 describe("ApiStatusBadge", () => {
   it.each<[ApiStatus, string]>([
     ["checking", "Connecting to API"],
+    ["waking", "API starting up, about a minute"],
     ["online", "API online"],
     ["offline", "API unavailable, retrying"],
   ])("announces the %s state", (status, label) => {

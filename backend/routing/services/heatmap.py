@@ -30,8 +30,8 @@ FRAME_COUNT = 50
 # Every heatmap is a single Open-Meteo request, which takes at most this many locations.
 MAX_CELLS = MAX_POINTS_PER_REQUEST
 # The same corridor and hours (another load or checkpoint spacing on the same trip) reuse the
-# forecast for this long, like plans.
-FORECAST_CACHE_S = 15 * 60
+# forecast for this long, like plans. Forecasts are hourly, so an hour loses nothing.
+FORECAST_CACHE_S = 60 * 60
 MIN_SPACING_M = 20_000
 SPACING_GROWTH = 1.25
 METERS_PER_DEGREE = 111_320
