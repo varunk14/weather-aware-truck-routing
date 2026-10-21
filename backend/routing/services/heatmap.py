@@ -21,19 +21,20 @@ from datetime import datetime
 
 from django.core.cache import cache
 
-from routing.clients.open_meteo import MAX_POINTS_PER_REQUEST, HourlyForecast, OpenMeteoClient
+from routing.clients.open_meteo import HourlyForecast, OpenMeteoClient
 from routing.geo import LatLon, sample_along
 from routing.risk import Conditions, RiskLevel, assess_checkpoint
 from routing.services.weather import FALLBACK_HOURS, HOUR, floor_hour, total_near
 
 FRAME_COUNT = 50
-# Every heatmap is a single Open-Meteo request, which takes at most this many locations.
-MAX_CELLS = MAX_POINTS_PER_REQUEST
+# Each cell is one call against Open-Meteo's free limit of 600 a minute, and a plan's checkpoints
+# need up to about 200 more, so 120 cells let two new trips be planned within the same minute.
+MAX_CELLS = 120
 # The same corridor and hours (another load or checkpoint spacing on the same trip) reuse the
 # forecast for this long, like plans. Forecasts are hourly, so an hour loses nothing.
 FORECAST_CACHE_S = 60 * 60
 MIN_SPACING_M = 20_000
-SPACING_GROWTH = 1.25
+SPACING_GROWTH = 1.1
 METERS_PER_DEGREE = 111_320
 
 
