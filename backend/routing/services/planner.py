@@ -150,6 +150,9 @@ def _build_plan(
         raise TripTooLongError(shortest_mi)
     named = list(zip(ROUTE_IDS, options, strict=False))
     checkpoints = [place_checkpoints(option.route, trip.interval_mi) for _, option in named]
+    # The simplified lines are drawn on the map and also outline the heatmap's corridor, whose
+    # cells are 20 km or more, so the full-detail routes are walked only once each.
+    geometries = [tuple(simplify(option.route.points, GEOMETRY_TOLERANCE_M)) for _, option in named]
 
     # One weather lookup for the checkpoints of every route, then split back per route, while
     # the heatmap's weather is fetched alongside. If the checkpoints' lookup fails, the error is
@@ -159,7 +162,7 @@ def _build_plan(
         heatmap_lookup = pool.submit(
             corridor_heatmap,
             weather,
-            [option.route.points for _, option in named],
+            geometries,
             trip.departure,
             trip.load_lb,
         )
@@ -171,10 +174,14 @@ def _build_plan(
         pool.shutdown(wait=False)
     routes = []
     start = 0
-    for (route_id, option), route_checkpoints in zip(named, checkpoints, strict=True):
+    for (route_id, option), geometry, route_checkpoints in zip(
+        named, geometries, checkpoints, strict=True
+    ):
         end = start + len(route_checkpoints)
         routes.append(
-            _plan_route(route_id, option, route_checkpoints, forecasts[start:end], trip.load_lb)
+            _plan_route(
+                route_id, option, geometry, route_checkpoints, forecasts[start:end], trip.load_lb
+            )
         )
         start = end
 
@@ -203,6 +210,7 @@ def _heatmap(result: Callable[[], Heatmap]) -> Heatmap | None:
 def _plan_route(
     route_id: str,
     option: RouteOption,
+    geometry: tuple[LatLon, ...],
     checkpoints: list[Checkpoint],
     forecasts: Sequence[Weather],
     load_lb: int,
@@ -220,7 +228,7 @@ def _plan_route(
         departure=route.departure,
         arrival=route.arrival,
         detour=option.detour,
-        geometry=tuple(simplify(route.points, GEOMETRY_TOLERANCE_M)),
+        geometry=geometry,
         checkpoints=assessed,
         risk=_route_risk(assessed),
     )

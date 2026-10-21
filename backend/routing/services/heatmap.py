@@ -21,19 +21,20 @@ from datetime import datetime
 
 from django.core.cache import cache
 
-from routing.clients.open_meteo import MAX_POINTS_PER_REQUEST, HourlyForecast, OpenMeteoClient
+from routing.clients.open_meteo import HourlyForecast, OpenMeteoClient
 from routing.geo import LatLon, sample_along
 from routing.risk import Conditions, RiskLevel, assess_checkpoint
 from routing.services.weather import FALLBACK_HOURS, HOUR, floor_hour, total_near
 
 FRAME_COUNT = 50
-# Every heatmap is a single Open-Meteo request, which takes at most this many locations.
-MAX_CELLS = MAX_POINTS_PER_REQUEST
+# Each cell is one call against Open-Meteo's free limit of 600 a minute, and a plan's checkpoints
+# need up to about 200 more, so 120 cells let two new trips be planned within the same minute.
+MAX_CELLS = 120
 # The same corridor and hours (another load or checkpoint spacing on the same trip) reuse the
 # forecast for this long, like plans. Forecasts are hourly, so an hour loses nothing.
 FORECAST_CACHE_S = 60 * 60
 MIN_SPACING_M = 20_000
-SPACING_GROWTH = 1.25
+SPACING_GROWTH = 1.1
 METERS_PER_DEGREE = 111_320
 
 
@@ -76,9 +77,12 @@ def corridor_cells(lines: Sequence[Sequence[LatLon]], max_cells: int = MAX_CELLS
     # A flat grid scaled for the middle latitude of the trip, so cells are close to square.
     middle = (min(p.lat for p in points) + max(p.lat for p in points)) / 2
     scale = math.cos(math.radians(middle))
+    # Every line is walked once, in steps of half the smallest spacing; larger spacings reuse
+    # the same samples, which are then closer together than half their cell.
+    samples = [[*sample_along(line, MIN_SPACING_M / 2), line[-1]] for line in lines if line]
     spacing = float(MIN_SPACING_M)
     while True:
-        cells = _cells(lines, spacing, scale)
+        cells = _cells(samples, spacing, scale)
         if len(cells) <= max_cells:
             lat_step = spacing / METERS_PER_DEGREE
             return Corridor(spacing, cells, lat_step=lat_step, lon_step=lat_step / scale)
@@ -120,7 +124,7 @@ def _cache_key(cells: Sequence[LatLon], start: datetime) -> str:
     return "heatmap:" + hashlib.sha256(text.encode()).hexdigest()
 
 
-def _cells(lines: Sequence[Sequence[LatLon]], spacing: float, scale: float) -> tuple[LatLon, ...]:
+def _cells(samples: Sequence[Sequence[LatLon]], spacing: float, scale: float) -> tuple[LatLon, ...]:
     def index(point: LatLon) -> tuple[int, int]:
         return (
             round(point.lon * scale * METERS_PER_DEGREE / spacing),
@@ -128,10 +132,8 @@ def _cells(lines: Sequence[Sequence[LatLon]], spacing: float, scale: float) -> t
         )
 
     taken: set[tuple[int, int]] = set()
-    for line in lines:
-        if not line:
-            continue
-        for point in [*sample_along(line, spacing / 2), line[-1]]:
+    for line in samples:
+        for point in line:
             col, row = index(point)
             taken.update((col + dc, row + dr) for dc in (-1, 0, 1) for dr in (-1, 0, 1))
     centres = (

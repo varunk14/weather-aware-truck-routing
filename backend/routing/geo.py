@@ -90,14 +90,26 @@ def simplify(points: Sequence[LatLon], tolerance_m: float) -> list[LatLon]:
     keep = [False] * len(points)
     keep[0] = keep[-1] = True
     stack = [(0, len(points) - 1)]
+    tolerance_sq = tolerance_m * tolerance_m
     while stack:
         start, end = stack.pop()
+        # Distance from each point to the segment, squared, with the segment's own values
+        # worked out once rather than for every point: this loop is the hot path.
+        ax, ay = xy[start]
+        dx, dy = xy[end][0] - ax, xy[end][1] - ay
+        length_sq = dx * dx + dy * dy
         farthest, index = 0.0, -1
         for i in range(start + 1, end):
-            distance = _segment_distance(xy[i], xy[start], xy[end])
-            if distance > farthest:
-                farthest, index = distance, i
-        if farthest > tolerance_m:
+            px, py = xy[i][0] - ax, xy[i][1] - ay
+            if length_sq == 0:
+                ex, ey = px, py
+            else:
+                t = max(0.0, min(1.0, (px * dx + py * dy) / length_sq))
+                ex, ey = px - t * dx, py - t * dy
+            distance_sq = ex * ex + ey * ey
+            if distance_sq > farthest:
+                farthest, index = distance_sq, i
+        if farthest > tolerance_sq:
             keep[index] = True
             stack.extend(((start, index), (index, end)))
     return [point for point, kept in zip(points, keep, strict=True) if kept]
@@ -154,14 +166,3 @@ class _Projection:
 
     def __call__(self, point: LatLon) -> tuple[float, float]:
         return point.lon * self._kx, point.lat * self._ky
-
-
-def _segment_distance(
-    p: tuple[float, float], a: tuple[float, float], b: tuple[float, float]
-) -> float:
-    dx, dy = b[0] - a[0], b[1] - a[1]
-    length_sq = dx * dx + dy * dy
-    if length_sq == 0:
-        return math.hypot(p[0] - a[0], p[1] - a[1])
-    t = max(0.0, min(1.0, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / length_sq))
-    return math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy))
