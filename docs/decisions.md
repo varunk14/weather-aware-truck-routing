@@ -257,9 +257,10 @@ A plan takes about three to five seconds, mostly for routing, and up to 20 for v
 the seconds, says so if a service is slow, and can be cancelled. A cancelled request leaves the
 previous plan on screen.
 
-### 45. Departure from the browser's calendar
+### 45. A calendar for the departure
 
-The departure uses the browser's own date and time picker, limited to the allowed window (from
-15 minutes ago to seven days ahead), so days outside it cannot be picked. On desktops that picker
-has no confirm button, so the chosen departure is spelled out under the field ("Leaves Sat,
-Oct 24, 8:00 PM") and changes as soon as a new date or time is picked.
+The browser's own date picker cannot be styled and, on desktops, has no confirm button. The form
+uses its own calendar instead: a month view in which only the allowed days (now to seven days
+ahead) can be picked, a time in 15 minute steps with past times disabled, and Cancel and Done.
+The departure changes only on Done; Escape or a click outside leave it as it was. The arrow keys
+move between days.
