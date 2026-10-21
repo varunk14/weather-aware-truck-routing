@@ -113,9 +113,13 @@ def find_route_options(
 
 
 def _options(routes: Sequence[TruckRoute], detours: Sequence[TruckRoute]) -> list[RouteOption]:
-    """TomTom's routes first, then detours that also differ from them, up to three in all."""
+    """TomTom's routes first, then detours that also differ from them, up to three in all.
+
+    Detours finish in no particular order; taking the quickest first keeps the result, and so
+    the route letters, the same from one run to the next.
+    """
     options = [RouteOption(route, detour=False) for route in routes[:ROUTE_COUNT]]
-    for detour in detours:
+    for detour in sorted(detours, key=lambda route: route.travel_time_s):
         if len(options) < ROUTE_COUNT and _is_distinct(detour, [o.route for o in options]):
             options.append(RouteOption(detour, detour=True))
     return options

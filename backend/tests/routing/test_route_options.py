@@ -75,7 +75,8 @@ def test_uses_detours_when_tomtom_alternatives_are_slow(
     started = time.monotonic()
     options = find(tomtom)
 
-    assert options == [(145_362, False), (234_331, True), (312_609, True)]
+    # Detours come quickest first, whichever finished first.
+    assert options == [(145_362, False), (312_609, True), (234_331, True)]
     assert time.monotonic() - started < 0.5  # did not wait for TomTom's alternatives
 
 
