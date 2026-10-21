@@ -55,7 +55,7 @@ class PlaceSuggestView(APIView):
 
 
 class RoutesView(APIView):
-    """Three truck route options, each with checkpoints and estimated arrival times."""
+    """Three truck route options with weather risk at each checkpoint, and a recommendation."""
 
     throttle_classes = (RoutesThrottle,)
 
@@ -63,7 +63,9 @@ class RoutesView(APIView):
         serializer = TripRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
-            plan = plan_trip(clients.tomtom_client(), serializer.to_trip())
+            plan = plan_trip(
+                clients.tomtom_client(), clients.open_meteo_client(), serializer.to_trip()
+            )
         except SamePlaceError as error:
             raise serializers.ValidationError({"destination": [str(error)]}) from error
         return Response(plan_to_json(plan))

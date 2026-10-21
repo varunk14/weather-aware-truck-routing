@@ -1,4 +1,4 @@
-"""Turns third-party failures into clear API responses instead of server errors."""
+"""Turns TomTom and Open-Meteo failures into clear API responses instead of server errors."""
 
 import logging
 from typing import Any
@@ -7,6 +7,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import exception_handler as drf_exception_handler
 
+from routing.clients.open_meteo import WeatherError, WeatherUnavailableError
 from routing.clients.tomtom import (
     NoRouteFoundError,
     PlaceNotFoundError,
@@ -14,11 +15,12 @@ from routing.clients.tomtom import (
     TomTomNotConfiguredError,
     TomTomUnavailableError,
 )
+from routing.services.weather import IncompleteForecastError
 
 logger = logging.getLogger(__name__)
 
-# Checked in order; the generic TomTomError comes last.
-_TOMTOM_ERRORS: tuple[tuple[type[TomTomError], int, str], ...] = (
+# Checked in order; the generic error of each service comes after its specific ones.
+_UPSTREAM_ERRORS: tuple[tuple[type[Exception], int, str], ...] = (
     (
         TomTomNotConfiguredError,
         status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -44,11 +46,26 @@ _TOMTOM_ERRORS: tuple[tuple[type[TomTomError], int, str], ...] = (
         status.HTTP_502_BAD_GATEWAY,
         "The routing service returned an unexpected response.",
     ),
+    (
+        WeatherUnavailableError,
+        status.HTTP_503_SERVICE_UNAVAILABLE,
+        "The weather service is not responding. Try again in a moment.",
+    ),
+    (
+        IncompleteForecastError,
+        status.HTTP_502_BAD_GATEWAY,
+        "The weather forecast is incomplete for part of this trip. Try again later.",
+    ),
+    (
+        WeatherError,
+        status.HTTP_502_BAD_GATEWAY,
+        "The weather service returned an unexpected response.",
+    ),
 )
 
 
 def exception_handler(exc: Exception, context: dict[str, Any]) -> Response | None:
-    for error_type, status_code, detail in _TOMTOM_ERRORS:
+    for error_type, status_code, detail in _UPSTREAM_ERRORS:
         if isinstance(exc, error_type):
             logger.warning("%s: %s", type(exc).__name__, exc)
             return Response({"detail": detail}, status=status_code)

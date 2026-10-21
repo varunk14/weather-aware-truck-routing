@@ -4,6 +4,7 @@ from functools import cache
 
 from django.conf import settings
 
+from routing.clients.open_meteo import OpenMeteoClient
 from routing.clients.tomtom import TomTomClient
 
 
@@ -11,3 +12,9 @@ from routing.clients.tomtom import TomTomClient
 def tomtom_client() -> TomTomClient:
     """The shared TomTom client, created on first use so a missing key only affects routing."""
     return TomTomClient(settings.TOMTOM_API_KEY)
+
+
+@cache
+def open_meteo_client() -> OpenMeteoClient:
+    """The shared Open-Meteo client. Open-Meteo needs no key."""
+    return OpenMeteoClient()

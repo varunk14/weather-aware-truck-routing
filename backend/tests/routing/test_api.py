@@ -7,8 +7,16 @@ from django.utils import timezone
 
 from routing import clients
 from routing.clients.tomtom import TomTomNotConfiguredError
+from routing.geo import LatLon
 from routing.throttles import RoutesThrottle, SuggestThrottle
-from tests.routing.conftest import FakeTomTom, load
+from tests.routing.conftest import (
+    CALM,
+    FakeOpenMeteo,
+    FakeTomTom,
+    WeatherValues,
+    load,
+    load_open_meteo,
+)
 
 CHICAGO = {"lat": 41.8781, "lon": -87.6298}
 MILWAUKEE = {"lat": 43.0389, "lon": -87.9065}
@@ -88,7 +96,7 @@ class TestRoutes:
         assert 50 < len(route["geometry"]["coordinates"]) < 2_040
         assert [c["mile"] for c in route["checkpoints"]] == [0, 25, 50, 75, 90.3]
         first = route["checkpoints"][0]
-        assert set(first) == {"index", "mile", "lat", "lon", "eta"}
+        assert set(first) == {"index", "mile", "lat", "lon", "eta", "weather", "risk"}
         assert datetime.fromisoformat(first["eta"]) == datetime.fromisoformat(route["departure"])
 
     def test_resolves_picked_suggestions(self, client: Client, api_tomtom: FakeTomTom) -> None:
@@ -166,6 +174,139 @@ class TestRoutes:
         assert post(client, trip(departure=departure(minutes=-5))).status_code == 200
 
 
+def storm_on_interstate_94(point: LatLon, hour: datetime) -> WeatherValues:
+    """Severe rain (0.4 in/hr rain + 0.2 in/hr showers) over I-94 between Chicago and Milwaukee.
+
+    Routes A and B follow I-94; Route C swings west through Rockford and stays out of it.
+    """
+    if 42.2 <= point.lat <= 42.9 and point.lon > -88.0:
+        return {**CALM, "rain": 0.4, "showers": 0.2}
+    return CALM
+
+
+def wind(mph: float) -> Any:
+    return lambda point, hour: {**CALM, "wind_speed_10m": mph}
+
+
+class TestWeatherRisk:
+    def test_calm_weather_recommends_the_fastest_route(
+        self, client: Client, api_tomtom: FakeTomTom
+    ) -> None:
+        body = post(client, trip()).json()
+
+        assert body["recommendation"] == {
+            "route_id": "A",
+            "reason": "Fastest route, and no other route has less weather risk.",
+            "safe": True,
+        }
+        assert [r["rank"] for r in body["routes"]] == [1, 2, 3]
+        route = body["routes"][0]
+        assert route["risk"] == {
+            "miles": {"low": 90.3, "moderate": 0, "high": 0, "severe": 0, "no_travel": 0},
+            "average": 0,
+            "worst": "low",
+        }
+        first = route["checkpoints"][0]
+        assert first["weather"] == {
+            "wind_mph": 6.0,
+            "gust_mph": 11.0,
+            "rain_in_hr": 0,
+            "snow_in_hr": 0,
+        }
+        assert first["risk"] == {
+            "level": "low",
+            "score": 0,
+            "wind": "low",
+            "rain": "low",
+            "snow": "low",
+            "causes": [],
+        }
+
+    def test_a_storm_on_the_direct_routes_recommends_the_dry_detour(
+        self, client: Client, api_tomtom: FakeTomTom, open_meteo: FakeOpenMeteo
+    ) -> None:
+        open_meteo.weather = storm_on_interstate_94
+
+        body = post(client, trip()).json()
+
+        routes = {r["id"]: r for r in body["routes"]}
+        assert body["recommendation"]["route_id"] == "C"
+        assert body["recommendation"]["safe"] is True
+        assert body["recommendation"]["reason"].startswith("Avoids ")
+        assert (
+            "of Severe weather on the fastest route (Route A)" in body["recommendation"]["reason"]
+        )
+        assert routes["C"]["rank"] == 1
+        assert routes["A"]["risk"]["miles"]["severe"] > 0
+        assert routes["B"]["risk"]["miles"]["severe"] > 0
+        assert routes["C"]["risk"]["miles"]["severe"] == 0
+        stormy = [c for c in routes["A"]["checkpoints"] if c["risk"]["level"] == "severe"]
+        assert stormy
+        assert stormy[0]["weather"]["rain_in_hr"] == 0.6
+        assert stormy[0]["risk"]["causes"] == ["rain"]
+
+    @pytest.mark.parametrize(
+        ("load_lb", "level", "causes"),
+        [(38_000, "high", ["wind"]), (42_000, "severe", ["wind", "load"])],
+    )
+    def test_heavy_loads_raise_the_wind_risk(
+        self,
+        client: Client,
+        api_tomtom: FakeTomTom,
+        open_meteo: FakeOpenMeteo,
+        load_lb: int,
+        level: str,
+        causes: list[str],
+    ) -> None:
+        open_meteo.weather = wind(40)
+
+        body = post(client, trip(load_lb=load_lb)).json()
+
+        checkpoint = body["routes"][0]["checkpoints"][1]
+        assert checkpoint["risk"]["level"] == level
+        assert checkpoint["risk"]["causes"] == causes
+        assert body["routes"][0]["risk"]["worst"] == level
+
+    def test_no_travel_on_every_route_is_flagged(
+        self, client: Client, api_tomtom: FakeTomTom, open_meteo: FakeOpenMeteo
+    ) -> None:
+        open_meteo.weather = wind(60)
+
+        recommendation = post(client, trip()).json()["recommendation"]
+
+        assert recommendation["safe"] is False
+        assert recommendation["reason"].startswith("Every route crosses No Travel conditions.")
+
+    def test_one_weather_lookup_covers_every_route(
+        self, client: Client, api_tomtom: FakeTomTom, open_meteo: FakeOpenMeteo
+    ) -> None:
+        body = post(client, trip()).json()
+
+        checkpoints = sum(len(r["checkpoints"]) for r in body["routes"])
+        assert len(open_meteo.requests) == 1
+        # The shared origin and destination are fetched once, not once per route.
+        assert open_meteo.points_requested() < checkpoints
+
+    def test_the_forecast_window_follows_the_arrival_times(
+        self, client: Client, api_tomtom: FakeTomTom, open_meteo: FakeOpenMeteo
+    ) -> None:
+        post(client, trip())
+
+        # Departure 13:00 -05:00 and the last arrival 16:02 -05:00, padded by two hours.
+        params = open_meteo.requests[0].url.params
+        assert params["start_hour"] == "2026-10-21T16:00"
+        assert params["end_hour"] == "2026-10-22T00:00"
+
+    def test_weather_is_cached_with_the_plan(
+        self, client: Client, api_tomtom: FakeTomTom, open_meteo: FakeOpenMeteo
+    ) -> None:
+        body = trip()
+        post(client, body)
+        post(client, body)
+
+        assert len(open_meteo.requests) == 1
+
+
 class TestErrors:
     def test_no_truck_route(self, client: Client, api_tomtom: FakeTomTom) -> None:
         api_tomtom.respond("route", 400, load("route_no_route"))
@@ -206,6 +347,38 @@ class TestErrors:
 
         assert response.status_code == 503
         assert response.json() == {"detail": "Routing is not configured on the server."}
+
+    def test_weather_unavailable(
+        self, client: Client, api_tomtom: FakeTomTom, open_meteo: FakeOpenMeteo
+    ) -> None:
+        open_meteo.respond(429, {"error": True, "reason": "Too many requests"})
+
+        response = post(client, trip())
+
+        assert response.status_code == 503
+        assert response.json() == {
+            "detail": "The weather service is not responding. Try again in a moment."
+        }
+
+    def test_weather_request_rejected(
+        self, client: Client, api_tomtom: FakeTomTom, open_meteo: FakeOpenMeteo
+    ) -> None:
+        open_meteo.respond(400, load_open_meteo("error_out_of_range"))
+
+        response = post(client, trip())
+
+        assert response.status_code == 502
+        assert response.json() == {"detail": "The weather service returned an unexpected response."}
+
+    def test_incomplete_forecast(
+        self, client: Client, api_tomtom: FakeTomTom, open_meteo: FakeOpenMeteo
+    ) -> None:
+        open_meteo.weather = lambda point, hour: {**CALM, "snowfall": None}
+
+        response = post(client, trip())
+
+        assert response.status_code == 502
+        assert "incomplete" in response.json()["detail"]
 
 
 class TestRateLimits:

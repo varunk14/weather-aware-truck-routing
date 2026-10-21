@@ -103,6 +103,23 @@ The best-ranked route is recommended with one sentence that compares it with the
 In the last case the recommendation is marked as not safe, so the interface can warn the driver
 instead of presenting the route as a safe choice.
 
+## 8. Where the weather comes from
+
+Forecasts come from [Open-Meteo](https://open-meteo.com): sustained wind speed at 10 m, wind
+gusts, rain, showers and snowfall, hourly, in mph and inches. Each checkpoint uses the forecast
+for the time the truck is expected there:
+
+| Value             | Forecast hour used                    | Arrival 12:37 uses |
+| ----------------- | ------------------------------------- | ------------------ |
+| Rain, snow, gusts | The hour that contains the arrival    | 13:00 (12 to 13)   |
+| Wind              | The whole hour nearest to the arrival | 13:00              |
+
+Open-Meteo reports rain and snow as the total, and gusts as the maximum, over the hour ending at
+each time, which is why 12:37 uses the 13:00 value. Rain is `rain` plus `showers`, both from the
+same hour. A missing value is replaced by the nearest value at most two hours away; if there is
+none, the trip cannot be assessed and the API says so instead of guessing. Gusts are shown for
+context only; the level uses the sustained wind speed.
+
 ## Trying it
 
 ```bash
@@ -124,3 +141,5 @@ Result                Severe (wind, load)
 on its own, and each recommendation sentence. Property-based tests (Hypothesis) check that more
 wind, rain, snow or load never lowers a level, that checkpoint coverage always adds up to the
 route length, and that the recommended route is never worse than another.
+`backend/tests/routing/test_weather.py` covers the hour matching, including arrivals in other
+time zones, and every fallback case.

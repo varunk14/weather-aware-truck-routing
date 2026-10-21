@@ -200,6 +200,15 @@ class TestFailures:
         with pytest.raises(TomTomUnavailableError):
             tomtom.client().geocode("Milwaukee")
 
+    def test_a_body_that_cannot_be_decoded_counts_as_unavailable(self, tomtom: FakeTomTom) -> None:
+        def undecodable(request: httpx.Request) -> httpx.Response:
+            raise httpx.DecodingError("bad gzip", request=request)
+
+        tomtom.overrides["geocode"] = undecodable
+
+        with pytest.raises(TomTomUnavailableError):
+            tomtom.client().geocode("Milwaukee")
+
     def test_rate_limiting_is_not_retried(self, tomtom: FakeTomTom) -> None:
         tomtom.respond("geocode", 429)
 

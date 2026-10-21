@@ -162,28 +162,59 @@ Identical trips are cached for 15 minutes and place lookups for a day. Each clie
 The routing API itself accepts any past departure, so the API enforces the window: from 15
 minutes ago, so a form filled in at "now" is not rejected, up to 7 days ahead.
 
+### 32. Weather for the hour the truck arrives
+
+Open-Meteo reports rain, showers, snowfall and gusts over the hour ending at each time, so a
+checkpoint reached at 12:37 uses the 13:00 values (12:00 to 13:00). Wind speed is an instant
+value and comes from the nearest hour. If a value is missing, the nearest hour at most two hours
+away that has it is used (rain and showers always from the same hour); beyond that the plan fails
+with a clear message rather than guessing.
+
+### 33. One weather lookup for all three routes
+
+The checkpoints of every route are looked up together. Checkpoints within 0.01 degrees (about
+1 km) share one forecast, which merges the shared origin and destination. A coarser grid was
+measured and saves almost nothing (Chicago to Denver at 10 miles: 351 locations at 0.01 degrees,
+349 at 0.05), because the routes' checkpoints rarely fall close together. Up to 200 locations go
+into one request, the most a request URL carries safely. Larger trips are split into batches
+ordered by arrival time, so each request only asks for the hours its checkpoints need, and the
+batches are fetched in parallel with a 10 second timeout each.
+
+### 34. The weather quota
+
+Open-Meteo's free tier allows 600 calls a minute, 5,000 an hour and 10,000 a day; Clearway counts
+each location as one call. Chicago to Denver needs 71 locations at 50 mile spacing, 141 at 25
+miles and 351 at 10 miles, so the daily limit covers about 70 trips at the default spacing. Plans
+are cached for 15 minutes, and if Open-Meteo starts rate limiting, the API says the weather
+service is busy instead of failing silently.
+
+### 35. Machine-readable risk levels
+
+The API reports levels as `low`, `moderate`, `high`, `severe` and `no_travel`, with the numeric
+score alongside, so the interface can choose labels and colours without parsing text.
+
 ## Interface
 
-### 32. Product name
+### 36. Product name
 
 The app is called Clearway: finding the clear road.
 
-### 33. Visual design
+### 37. Visual design
 
 Light, warm surfaces with navy text and a teal accent, set in DM Sans. Green, yellow, orange, red
 and purple are reserved for risk levels and never used as interface colours.
 
-### 34. One risk scale everywhere
+### 38. One risk scale everywhere
 
 Checkpoint markers, route bars, labels and the heatmap use the same five colours. Risk is never
 shown by colour alone: every level is also named.
 
-### 35. The heatmap shows true levels
+### 39. The heatmap shows true levels
 
 Each location on the heatmap shows its actual risk level, rather than a density blend that would
 overstate risk where samples cluster.
 
-### 36. Built for phones as well as desktops
+### 40. Built for phones as well as desktops
 
 Every screen works on phones from 360 px wide as well as on tablets and desktops: no horizontal
 scrolling, touch-sized controls, inputs large enough to avoid zoom on focus, and respect for the

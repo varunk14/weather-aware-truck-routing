@@ -1,14 +1,18 @@
 # API
 
 All endpoints are under `/api`, accept and return JSON, and need no authentication.
-Third-party services (TomTom) are only ever called by the API, never by the browser.
+Third-party services (TomTom, Open-Meteo) are only ever called by the API, never by the browser.
 
 ## `GET /api/health`
 
 Liveness check used by the hosting platform, the uptime monitor and the web app.
 
 ```json
-{ "status": "ok", "version": "0.1.0", "time": "2026-10-21T12:00:00.000000+00:00" }
+{
+  "status": "ok",
+  "version": "0.1.0",
+  "time": "2026-10-21T12:00:00.000000+00:00"
+}
 ```
 
 ## `GET /api/places/suggest?q=…`
@@ -35,15 +39,19 @@ United States, Canada and Mexico.
 
 ## `POST /api/routes`
 
-Three truck route options between two places, each with checkpoints and the truck's
-estimated arrival time at every checkpoint.
+Three truck route options between two places. Each route has checkpoints with the truck's
+estimated arrival time, the forecast weather for that hour and its risk level, and a route-level
+risk summary. One route is recommended, with a sentence explaining why.
 
 ### Request
 
 ```json
 {
   "origin": { "query": "Chicago, IL" },
-  "destination": { "place_id": "T2ME35qKUleNLKiycGnySA", "place_type": "areas" },
+  "destination": {
+    "place_id": "T2ME35qKUleNLKiycGnySA",
+    "place_type": "areas"
+  },
   "departure": "2026-10-21T12:00:00Z",
   "load_lb": 38000,
   "interval_mi": 25
@@ -74,18 +82,52 @@ estimated arrival time at every checkpoint.
       "departure": "2026-10-21T07:00:00-05:00",
       "arrival": "2026-10-21T20:06:31-06:00",
       "detour": false,
-      "geometry": { "type": "LineString", "coordinates": [[-87.6324, 41.88323]] },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[-87.6324, 41.88323]]
+      },
+      "rank": 1,
+      "risk": {
+        "miles": {
+          "low": 981.3,
+          "moderate": 25.0,
+          "high": 0.0,
+          "severe": 0.0,
+          "no_travel": 0.0
+        },
+        "average": 0.025,
+        "worst": "moderate"
+      },
       "checkpoints": [
         {
           "index": 0,
           "mile": 0.0,
           "lat": 41.88323,
           "lon": -87.6324,
-          "eta": "2026-10-21T07:00:00-05:00"
+          "eta": "2026-10-21T07:00:00-05:00",
+          "weather": {
+            "wind_mph": 12.4,
+            "gust_mph": 21.7,
+            "rain_in_hr": 0.12,
+            "snow_in_hr": 0.0
+          },
+          "risk": {
+            "level": "moderate",
+            "score": 1,
+            "wind": "low",
+            "rain": "moderate",
+            "snow": "low",
+            "causes": ["rain"]
+          }
         }
       ]
     }
   ],
+  "recommendation": {
+    "route_id": "A",
+    "reason": "Fastest route, and no other route has less weather risk.",
+    "safe": true
+  },
   "notes": []
 }
 ```
@@ -98,16 +140,27 @@ estimated arrival time at every checkpoint.
 - `detour: true` marks a route found by routing through a point beside the main route, used when
   TomTom offers fewer than three alternatives. `notes` explains this, and says so when fewer than
   three distinct routes exist.
+- `rank` orders the routes from safest (1) by the rules in the risk model; the route ranked 1 is
+  the one in `recommendation`. `safe: false` means every route, including the recommended one,
+  crosses No Travel conditions.
+- Risk levels are `low`, `moderate`, `high`, `severe` and `no_travel`; `score` is 0 to 4.
+  `causes` lists what set the checkpoint's level: `wind`, `rain`, `snow`, or `wind` and `load`
+  when a heavy load raised the wind level.
+- `risk.miles` gives the miles of road at each level (each checkpoint stands for the road halfway
+  to its neighbours); `average` is the mile-weighted mean score.
+- `weather` is the forecast for the hour the truck reaches the checkpoint: wind in mph, rain
+  (including showers) and snow in inches per hour. Gusts are shown for context; the risk level
+  uses the sustained wind speed.
 
 ### Errors
 
-| Status | When                                                                      |
-| ------ | ------------------------------------------------------------------------- |
-| 400    | The request is invalid; the body names each field and the reason.        |
-| 422    | A place cannot be found, or no truck route connects the places.           |
-| 429    | Too many requests from this client; retry after the `Retry-After` header. |
-| 502    | TomTom returned a response the API could not use.                         |
-| 503    | TomTom is not responding, or routing is not configured.                   |
+| Status | When                                                                                      |
+| ------ | ----------------------------------------------------------------------------------------- |
+| 400    | The request is invalid; the body names each field and the reason.                         |
+| 422    | A place cannot be found, or no truck route connects the places.                           |
+| 429    | Too many requests from this client; retry after the `Retry-After` header.                 |
+| 502    | TomTom or Open-Meteo returned a response the API could not use, or the forecast has gaps. |
+| 503    | TomTom or Open-Meteo is not responding or is rate limiting, or routing is not configured. |
 
 Error bodies have a `detail` message, for example
 `{"detail": "No truck route connects these places."}`.
@@ -115,4 +168,5 @@ Error bodies have a `detail` message, for example
 ## Rate limits
 
 Per client IP address: 60 suggestion requests and 10 route requests per minute. Identical trips
-are cached for 15 minutes and place lookups for a day, so reloading does not use the quota again.
+are cached for 15 minutes, weather included, and place lookups for a day, so reloading does not
+use the quota again.
