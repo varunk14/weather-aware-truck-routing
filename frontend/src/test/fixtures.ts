@@ -1,4 +1,4 @@
-import type { Checkpoint, PlannedRoute, RiskLevel, TripPlan } from "../lib/types";
+import type { Checkpoint, Heatmap, PlannedRoute, RiskLevel, TripPlan } from "../lib/types";
 
 /** A checkpoint with calm weather unless overridden. */
 export function checkpoint(index: number, mile: number, overrides: Partial<Checkpoint> = {}) {
@@ -47,6 +47,51 @@ const rainy = checkpoint(1, 50, {
   risk: { level: "high", score: 2, wind: "low", rain: "high", snow: "low", causes: ["rain"] },
 });
 
+const FRAMES = 50;
+
+/**
+ * Three cells along the trip. Frame i is 08:00 -07:00 plus i hours: the middle cell has High
+ * rain from frame 3 to 5 and the last one has no forecast at frame 10.
+ */
+export function heatmap(overrides: Partial<Heatmap> = {}): Heatmap {
+  const frames = (value: (i: number) => number | null) =>
+    Array.from({ length: FRAMES }, (_, i) => value(i));
+  const rainy = (i: number) => i >= 3 && i <= 5;
+  return {
+    start: "2026-10-22T15:00:00+00:00",
+    frames: FRAMES,
+    spacing_m: 20_000,
+    cell_size: { lat: 0.5, lon: 0.5 },
+    cells: [
+      {
+        lat: 47,
+        lon: -122,
+        risk: frames(() => 0),
+        wind: frames((i) => i),
+        rain: frames(() => 0),
+        snow: frames(() => 0),
+      },
+      {
+        lat: 46.5,
+        lon: -121.5,
+        risk: frames((i) => (rainy(i) ? 2 : 0)),
+        wind: frames(() => 8),
+        rain: frames((i) => (rainy(i) ? 0.3 : 0)),
+        snow: frames(() => 0),
+      },
+      {
+        lat: 46,
+        lon: -121,
+        risk: frames((i) => (i === 10 ? null : 0)),
+        wind: frames((i) => (i === 10 ? null : 5)),
+        rain: frames(() => 0),
+        snow: frames(() => 0),
+      },
+    ],
+    ...overrides,
+  };
+}
+
 /** Three routes: A is fastest but crosses High rain, B is recommended, C is longest. */
 export function tripPlan(overrides: Partial<TripPlan> = {}): TripPlan {
   return {
@@ -83,6 +128,7 @@ export function tripPlan(overrides: Partial<TripPlan> = {}): TripPlan {
       safe: true,
     },
     notes: [],
+    heatmap: heatmap(),
     ...overrides,
   };
 }

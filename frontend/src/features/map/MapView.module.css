@@ -22,6 +22,25 @@
   }
 }
 
+/* The truck on the selected route at the slider's hour. */
+.truck {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  border: 2px solid var(--color-surface);
+  border-radius: 9px;
+  background: var(--color-route-selected);
+  box-shadow: 0 2px 6px rgb(13 30 45 / 35%);
+  pointer-events: none;
+  place-items: center;
+}
+
+.truck svg {
+  width: 20px;
+  height: 20px;
+  fill: var(--color-surface);
+}
+
 .fallback {
   position: absolute;
   inset: 0;
