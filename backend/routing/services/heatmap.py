@@ -76,9 +76,12 @@ def corridor_cells(lines: Sequence[Sequence[LatLon]], max_cells: int = MAX_CELLS
     # A flat grid scaled for the middle latitude of the trip, so cells are close to square.
     middle = (min(p.lat for p in points) + max(p.lat for p in points)) / 2
     scale = math.cos(math.radians(middle))
+    # Every line is walked once, in steps of half the smallest spacing; larger spacings reuse
+    # the same samples, which are then closer together than half their cell.
+    samples = [[*sample_along(line, MIN_SPACING_M / 2), line[-1]] for line in lines if line]
     spacing = float(MIN_SPACING_M)
     while True:
-        cells = _cells(lines, spacing, scale)
+        cells = _cells(samples, spacing, scale)
         if len(cells) <= max_cells:
             lat_step = spacing / METERS_PER_DEGREE
             return Corridor(spacing, cells, lat_step=lat_step, lon_step=lat_step / scale)
@@ -120,7 +123,7 @@ def _cache_key(cells: Sequence[LatLon], start: datetime) -> str:
     return "heatmap:" + hashlib.sha256(text.encode()).hexdigest()
 
 
-def _cells(lines: Sequence[Sequence[LatLon]], spacing: float, scale: float) -> tuple[LatLon, ...]:
+def _cells(samples: Sequence[Sequence[LatLon]], spacing: float, scale: float) -> tuple[LatLon, ...]:
     def index(point: LatLon) -> tuple[int, int]:
         return (
             round(point.lon * scale * METERS_PER_DEGREE / spacing),
@@ -128,10 +131,8 @@ def _cells(lines: Sequence[Sequence[LatLon]], spacing: float, scale: float) -> t
         )
 
     taken: set[tuple[int, int]] = set()
-    for line in lines:
-        if not line:
-            continue
-        for point in [*sample_along(line, spacing / 2), line[-1]]:
+    for line in samples:
+        for point in line:
             col, row = index(point)
             taken.update((col + dc, row + dr) for dc in (-1, 0, 1) for dr in (-1, 0, 1))
     centres = (
