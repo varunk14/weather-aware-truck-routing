@@ -102,12 +102,18 @@ departure instead of presenting that route as safe.
 TomTom's truck travel mode takes the vehicle weight into account, returns up to five alternative
 routes, and the same account covers geocoding and address suggestions.
 
-### 20. Always three routes
+### 20. Three routes, in a few seconds
 
-TomTom may return fewer alternatives than requested when no sensible ones exist. Extra routes are
-then requested through a point offset to either side of the main route's midpoint, and kept only
-if less than 90% of their length runs within 2 km of a route already found. These routes are
-marked as detours, and the response notes when fewer than three distinct routes exist.
+TomTom's own alternative routes take six to eleven seconds to compute for trips of a few hundred
+miles or more, and fail on very long trips, while a single fastest route takes one to two
+seconds. The fastest route and TomTom's alternatives are therefore requested together, and as
+soon as the fastest route arrives, two more are requested through points offset to either side
+of its middle (detours). TomTom's own alternatives are used if they arrive within four seconds;
+after that, whichever complete set of three is ready first is used. A detour is kept only if
+less than 90% of its length runs within 2 km of a route already found, and is marked as a detour
+in the response. Nothing waits longer than 20 seconds; the response notes when fewer than three
+distinct routes were found. Measured: Dallas to Houston 2.7 s, Chicago to Denver 4.3 s, Paris to
+Madrid 6.7 s, Lisbon to Moscow 18 s (it used to fail).
 
 ### 21. Open-Meteo for weather
 
@@ -247,6 +253,13 @@ The departure is entered in the viewer's own time, which the form says.
 
 ### 44. Waiting is explained
 
-A plan takes about five to ten seconds, mostly for routing. The panel says what is happening, counts
+A plan takes about three to five seconds, mostly for routing, and up to 20 for very long trips. The panel says what is happening, counts
 the seconds, says so if a service is slow, and can be cancelled. A cancelled request leaves the
 previous plan on screen.
+
+### 45. Departure from day buttons and a time list
+
+A departure can only be from now to seven days ahead, so the form shows eight day buttons (Today,
+Tomorrow, then weekday and date) and a list of times every 15 minutes, with past times left out.
+Every choice applies at once and the chosen departure is spelled out under the list, which a
+browser's date picker does not do on desktops (it has no confirm button).

@@ -136,9 +136,9 @@ risk summary. One route is recommended, with a sentence explaining why.
   destination's. They are exact instants and can be converted freely.
 - `geometry` is simplified for drawing (every removed point lies within 30 m of the line).
   Checkpoints are placed on the full-detail route.
-- `detour: true` marks a route found by routing through a point beside the main route, used when
-  TomTom offers fewer than three alternatives. `notes` explains this, and says so when fewer than
-  three distinct routes exist.
+- `detour: true` marks a route found by routing through a point beside the fastest route. Detours
+  complete the set when TomTom's own alternatives are slow or too few; `notes` says which routes
+  are detours, and says so when fewer than three distinct routes were found.
 - `rank` orders the routes from safest (1) by the rules in the risk model; the route ranked 1 is
   the one in `recommendation`. `safe: false` means every route, including the recommended one,
   crosses No Travel conditions.

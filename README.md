@@ -80,7 +80,7 @@ Weather comes from Open-Meteo, which needs no key.
 
 - Trips can start and end anywhere TomTom has truck routing, up to 3,500 miles apart. Units are
   US customary everywhere (miles, mph, inches, pounds), as in the specification. Very long trips
-  (2,000 miles or more) can take 20 to 30 seconds to plan.
+  (2,000 miles or more) can take up to about 20 seconds to plan; most trips take 3 to 5.
 - Open-Meteo's free tier allows 10,000 calls a day, counted per location. A cross-country trip
   needs about 70 locations at 50 mile spacing, 140 at 25 miles and 350 at 10 miles, so the
   hosted demo handles roughly 70 default trips a day. Repeated trips are served from a
