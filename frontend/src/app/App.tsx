@@ -1,10 +1,13 @@
-import { lazy, type ReactNode, Suspense, useMemo, useState } from "react";
+import { lazy, type ReactNode, Suspense, useCallback, useMemo, useState } from "react";
 
 import { AppHeader } from "../components/AppHeader/AppHeader";
 import { Attribution } from "../components/Attribution/Attribution";
 import { BottomSheet, type SheetSnap } from "../components/BottomSheet/BottomSheet";
 import { EmptyState } from "../components/EmptyState/EmptyState";
 import { ErrorBoundary } from "../components/ErrorBoundary/ErrorBoundary";
+import type { HeatLayer } from "../features/heatmap/heatmap";
+import { Timeline } from "../features/heatmap/Timeline";
+import { truckAt } from "../features/heatmap/truck";
 import type { MapPadding } from "../features/map/MapView";
 import { CheckpointDetails } from "../features/results/CheckpointDetails";
 import { ErrorState, LoadingState } from "../features/results/PlanStatus";
@@ -14,6 +17,7 @@ import { TripSummary } from "../features/results/TripSummary";
 import { TripForm } from "../features/trip/TripForm";
 import { useTripPlanner } from "../features/trip/useTripPlanner";
 import { useApiStatus } from "../hooks/useApiStatus";
+import { useElementHeight } from "../hooks/useElementHeight";
 import { PHONE_QUERY, useMediaQuery } from "../hooks/useMediaQuery";
 import { formatDuration } from "../lib/format";
 import { routeById } from "../lib/plan";
@@ -32,14 +36,25 @@ const SHEET_START: Record<SheetView, SheetSnap> = {
   results: "peek",
 };
 
-const DESKTOP_PADDING: MapPadding = { top: 48, right: 48, bottom: 48, left: 48 };
+const DESKTOP_EDGE = 48;
 // Room around routes on a phone, so end markers and their labels stay on screen.
 const PHONE_EDGE = 32;
+// The timeline floats this far above the sheet on a phone; on larger screens it sits above
+// the map's credits line, which must stay visible.
+const TIMELINE_GAP = 12;
+const CREDITS_CLEARANCE = 40;
 
 interface Selection {
   plan: TripPlan | null;
   routeId: string | null;
   checkpoint: number | null;
+}
+
+/** The forecast slider; like the selection, it belongs to one plan and starts at departure. */
+interface Forecast {
+  plan: TripPlan | null;
+  hour: number;
+  playing: boolean;
 }
 
 /** What a screen reader hears when a plan arrives (errors are announced by their alert). */
@@ -70,6 +85,27 @@ export function App() {
       : { plan, routeId: plan?.recommendation.route_id ?? null, checkpoint: null };
   const route = plan ? routeById(plan, current.routeId) : undefined;
 
+  const [forecast, setForecast] = useState<Forecast>({ plan: null, hour: 0, playing: false });
+  const [heatLayer, setHeatLayer] = useState<HeatLayer>("risk");
+  const shownForecast: Forecast =
+    forecast.plan === plan ? forecast : { plan, hour: 0, playing: false };
+  const setHour = useCallback(
+    (hour: number) => {
+      setForecast((last) => ({ ...(last.plan === plan ? last : { playing: false }), plan, hour }));
+    },
+    [plan],
+  );
+  const setPlaying = useCallback(
+    (playing: boolean) => {
+      setForecast((last) => ({ ...(last.plan === plan ? last : { hour: 0 }), plan, playing }));
+    },
+    [plan],
+  );
+  const truck = useMemo(
+    () => (route ? truckAt(route, shownForecast.hour) : null),
+    [route, shownForecast.hour],
+  );
+
   let view: SheetView = "form";
   if (state.status === "loading") view = "loading";
   else if (failed && !editing) view = "error";
@@ -85,17 +121,36 @@ export function App() {
   }
   const [sheetHeight, setSheetHeight] = useState(0);
 
+  // The timeline shows with a plan's results; on a phone only with the sheet lowered, since any
+  // higher it would cover most of the map.
+  const showTimeline =
+    Boolean(plan && route) && (!phone || (view === "results" && snap === "peek"));
+  // Hiding the timeline pauses it, so it never starts playing again by itself when it returns.
+  if (!showTimeline && shownForecast.playing) {
+    setForecast({ ...shownForecast, playing: false });
+  }
+  const [timelineRef, timelineHeight] = useElementHeight();
+  const timelineBottom = phone ? sheetHeight + TIMELINE_GAP : CREDITS_CLEARANCE;
+  const timelineSpace = showTimeline
+    ? timelineHeight + (phone ? TIMELINE_GAP : CREDITS_CLEARANCE)
+    : 0;
+
   const padding = useMemo<MapPadding>(
     () =>
       phone
         ? {
             top: PHONE_EDGE,
             right: PHONE_EDGE,
-            bottom: sheetHeight + PHONE_EDGE,
+            bottom: sheetHeight + timelineSpace + PHONE_EDGE,
             left: PHONE_EDGE,
           }
-        : DESKTOP_PADDING,
-    [phone, sheetHeight],
+        : {
+            top: DESKTOP_EDGE,
+            right: DESKTOP_EDGE,
+            bottom: timelineSpace + DESKTOP_EDGE,
+            left: DESKTOP_EDGE,
+          },
+    [phone, sheetHeight, timelineSpace],
   );
 
   function onSubmit(): boolean {
@@ -257,10 +312,29 @@ export function App() {
               padding={padding}
               onSelectRoute={selectRoute}
               onSelectCheckpoint={selectCheckpoint}
+              heatLayer={showTimeline ? heatLayer : null}
+              hour={shownForecast.hour}
+              truck={showTimeline ? (truck?.lngLat ?? null) : null}
             />
           </Suspense>
         </ErrorBoundary>
         {details}
+        {showTimeline && plan && route && (
+          <div ref={timelineRef} className={styles.timeline} style={{ bottom: timelineBottom }}>
+            <Timeline
+              departure={route.departure}
+              hour={shownForecast.hour}
+              onHourChange={setHour}
+              playing={shownForecast.playing}
+              onPlayingChange={setPlaying}
+              layer={heatLayer}
+              onLayerChange={setHeatLayer}
+              routeId={route.id}
+              truck={truck}
+              heatmap={Boolean(plan.heatmap)}
+            />
+          </div>
+        )}
         {phone && (
           <BottomSheet
             label="Trip"

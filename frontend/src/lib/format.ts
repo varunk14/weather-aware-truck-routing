@@ -81,6 +81,20 @@ export function formatLocalTime(iso: string): string {
   return `${formatDay(iso)}, ${formatClock(iso)} (${formatOffset(iso)})`;
 }
 
+/** ``iso`` moved by ``hours``, written in the same UTC offset: "2026-10-22T14:30-05:00". */
+export function addHours(iso: string, hours: number): string {
+  const { offset } = parse(iso);
+  const sign = offset.startsWith("-") ? -1 : 1;
+  const offsetMinutes =
+    offset === "Z" ? 0 : sign * (Number(offset.slice(1, 3)) * 60 + Number(offset.slice(4, 6)));
+  const wall = new Date(Date.parse(iso) + hours * 3_600_000 + offsetMinutes * 60_000);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return (
+    `${String(wall.getUTCFullYear())}-${pad(wall.getUTCMonth() + 1)}-${pad(wall.getUTCDate())}` +
+    `T${pad(wall.getUTCHours())}:${pad(wall.getUTCMinutes())}${offset}`
+  );
+}
+
 /** The value for an <input type="datetime-local"> showing ``date`` in the browser's time zone. */
 export function toDatetimeLocal(date: Date): string {
   const pad = (value: number) => String(value).padStart(2, "0");
