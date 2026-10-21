@@ -7,8 +7,9 @@ the weather the truck will meet at each checkpoint at its estimated arrival time
 risk from wind, rain, snow and load weight, and recommends the safest route.
 
 > **Status:** in development. In place: the API and web app shell, tooling, CI, the risk engine
-> (thresholds, load rules, route scoring and ranking), and truck routing with checkpoints and
-> arrival times. Weather and the trip planner interface are added in the following milestones.
+> (thresholds, load rules, route scoring and ranking), truck routing with checkpoints and arrival
+> times, and the weather forecast at every checkpoint with a recommended route. The trip planner
+> interface and the weather heatmap are added in the following milestones.
 
 ## Tech stack
 
@@ -41,16 +42,16 @@ Open http://localhost:5173. The web app proxies `/api` to the API on http://127.
 
 ## Commands
 
-| Command        | What it does                                       |
-| -------------- | -------------------------------------------------- |
-| `make install` | Install backend and frontend dependencies          |
-| `make dev`     | Run the API and the web app together               |
-| `make lint`    | Lint, format-check and type-check both apps        |
-| `make format`  | Format both apps                                   |
-| `make test`    | Run unit and integration tests with coverage       |
-| `make e2e`     | Run browser end-to-end tests                       |
-| `make check`   | Run every check that CI runs                       |
-| `make build`   | Build the web app for production                   |
+| Command        | What it does                                 |
+| -------------- | -------------------------------------------- |
+| `make install` | Install backend and frontend dependencies    |
+| `make dev`     | Run the API and the web app together         |
+| `make lint`    | Lint, format-check and type-check both apps  |
+| `make format`  | Format both apps                             |
+| `make test`    | Run unit and integration tests with coverage |
+| `make e2e`     | Run browser end-to-end tests                 |
+| `make check`   | Run every check that CI runs                 |
+| `make build`   | Build the web app for production             |
 
 ## Risk rules
 
@@ -65,14 +66,22 @@ How levels, route scores and the ranking work is described in [docs/risk-model.m
 
 ## API
 
-| Method | Path                  | Description                                                    |
-| ------ | --------------------- | -------------------------------------------------------------- |
-| GET    | `/api/health`         | Liveness check: `status`, `version`, `time`                    |
-| GET    | `/api/places/suggest` | Place suggestions while typing an origin or destination        |
-| POST   | `/api/routes`         | Three truck routes with checkpoints and estimated arrival times |
+| Method | Path                  | Description                                                                   |
+| ------ | --------------------- | ----------------------------------------------------------------------------- |
+| GET    | `/api/health`         | Liveness check: `status`, `version`, `time`                                   |
+| GET    | `/api/places/suggest` | Place suggestions while typing an origin or destination                       |
+| POST   | `/api/routes`         | Three truck routes with weather risk at each checkpoint, and a recommendation |
 
 Request and response formats, validation rules and errors: [docs/api.md](docs/api.md).
 Routing needs a TomTom API key in `backend/.env` (`TOMTOM_API_KEY`); see `backend/.env.example`.
+Weather comes from Open-Meteo, which needs no key.
+
+## Limitations
+
+- Open-Meteo's free tier allows 10,000 calls a day, counted per location. A cross-country trip
+  needs about 70 locations at 50 mile spacing, 140 at 25 miles and 350 at 10 miles, so the
+  hosted demo handles roughly 70 default trips a day. Repeated trips are served from a
+  15 minute cache.
 
 ## Project structure
 
@@ -81,8 +90,8 @@ backend/
   config/            Django project: settings (base, dev, prod, test), URLs, WSGI
   routing/           API application: views, URL routes, management commands
   routing/risk/      Risk engine: thresholds, load rules, route scoring and ranking
-  routing/clients/   TomTom client (suggestions, places, geocoding, truck routing)
-  routing/services/  Trip planning: places, route options, checkpoints and arrival times
+  routing/clients/   TomTom (suggestions, places, geocoding, truck routing) and Open-Meteo clients
+  routing/services/  Trip planning: places, route options, checkpoints, weather, recommendation
   tests/             pytest suite
 frontend/
   src/app/           Application shell and layout
