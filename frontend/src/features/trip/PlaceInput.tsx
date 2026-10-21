@@ -10,10 +10,14 @@ const MIN_CHARS = 2;
 
 /**
  * Suggestions for ``query``, fetched after a short pause in typing. A newer query cancels the
- * request for an older one. The last results stay visible while the next ones load.
+ * request for an older one, and only suggestions for the text as it is now are returned, so an
+ * old list can never be picked for new text.
  */
 function useSuggestions(query: string): Suggestion[] {
-  const [found, setFound] = useState<Suggestion[]>([]);
+  const [found, setFound] = useState<{ query: string; results: Suggestion[] }>({
+    query: "",
+    results: [],
+  });
   const trimmed = query.trim();
   const active = trimmed.length >= MIN_CHARS;
 
@@ -21,10 +25,15 @@ function useSuggestions(query: string): Suggestion[] {
     if (!active) return;
     const controller = new AbortController();
     const timer = setTimeout(() => {
-      suggestPlaces(trimmed, controller.signal).then(setFound, (error: unknown) => {
-        // Suggestions only help; if they fail, typing a place by name still works.
-        if (!isAbortError(error)) setFound([]);
-      });
+      suggestPlaces(trimmed, controller.signal).then(
+        (results) => {
+          setFound({ query: trimmed, results });
+        },
+        (error: unknown) => {
+          // Suggestions only help; if they fail, typing a place by name still works.
+          if (!isAbortError(error)) setFound({ query: trimmed, results: [] });
+        },
+      );
     }, SUGGEST_DELAY_MS);
     return () => {
       clearTimeout(timer);
@@ -32,7 +41,7 @@ function useSuggestions(query: string): Suggestion[] {
     };
   }, [trimmed, active]);
 
-  return active ? found : [];
+  return active && found.query === trimmed ? found.results : [];
 }
 
 interface PlaceInputProps {
@@ -73,6 +82,8 @@ export function PlaceInput({ label, value, onChange, error, placeholder }: Place
         if (count) setActive((index) => (index <= 0 ? count - 1 : index - 1));
         break;
       case "Enter": {
+        // Enter that confirms an input method's composition (for example Japanese) is not a pick.
+        if (event.nativeEvent.isComposing) break;
         const suggestion = expanded ? suggestions[active] : undefined;
         if (suggestion) {
           event.preventDefault();

@@ -21,7 +21,10 @@
 
 /* The handle and peek content can be dragged; vertical panning there moves the sheet. */
 .grab {
+  display: flex;
+  /* Never squeezed by the content below; tall peek content is capped and scrolls instead. */
   flex: none;
+  flex-direction: column;
   touch-action: none;
 }
 
@@ -49,6 +52,7 @@
 }
 
 .peek {
+  min-height: 0;
   padding: 0 var(--space-4) var(--space-3);
   padding-right: calc(var(--space-4) + env(safe-area-inset-right));
   padding-left: calc(var(--space-4) + env(safe-area-inset-left));
@@ -66,4 +70,16 @@
 
 .sheet[data-snap="peek"] .content {
   overflow: hidden;
+  visibility: hidden;
+}
+
+/* Peek content that does not fit scrolls by touch; the handle still drags the sheet. */
+.sheet[data-peek-overflows] .peek {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+.sheet[data-peek-overflows] .handle {
+  touch-action: none;
 }

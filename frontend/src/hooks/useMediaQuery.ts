@@ -1,7 +1,8 @@
 import { useCallback, useSyncExternalStore } from "react";
 
 /** Phones get the map with a bottom sheet; wider screens get the side panel. */
-export const PHONE_QUERY = "(width < 768px)";
+// max-width rather than range syntax (width < 768px), which Safari before 16.4 ignores.
+export const PHONE_QUERY = "(max-width: 767.98px)";
 
 /** Whether ``query`` matches, updated as the window changes. */
 export function useMediaQuery(query: string): boolean {

@@ -38,6 +38,7 @@ export function TripForm({ draft, errors, busy, onChange, onSubmit }: TripFormPr
       noValidate
       onSubmit={(event) => {
         event.preventDefault();
+        if (busy) return;
         if (!onSubmit()) {
           // Move to the first field that needs fixing once its message has rendered.
           requestAnimationFrame(() => {
@@ -151,7 +152,8 @@ export function TripForm({ draft, errors, busy, onChange, onSubmit }: TripFormPr
         </p>
       )}
 
-      <button type="submit" className={styles.submit} disabled={busy}>
+      {/* aria-disabled rather than disabled, so the button keeps the keyboard focus. */}
+      <button type="submit" className={styles.submit} aria-disabled={busy}>
         {busy ? "Planning routes…" : "Plan routes"}
       </button>
     </form>

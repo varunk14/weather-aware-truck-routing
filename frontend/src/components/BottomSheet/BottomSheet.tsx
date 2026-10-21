@@ -75,7 +75,8 @@ export function BottomSheet({
     const container = sheetRef.current?.parentElement;
     const peekContent = peekRef.current;
     if (!container || !peekContent) return;
-    const next = { available: container.clientHeight, peek: peekContent.offsetHeight };
+    // scrollHeight: the content's full height, even while it is capped and scrolls.
+    const next = { available: container.clientHeight, peek: peekContent.scrollHeight };
     // Same numbers keep the same state, so measuring after every render cannot loop.
     setSpace((current) =>
       current.available === next.available && current.peek === next.peek ? current : next,
@@ -84,6 +85,17 @@ export function BottomSheet({
 
   // The peek content changes with what the sheet shows; size the sheet to it before paint.
   useLayoutEffect(measure);
+
+  // Content can vanish under the keyboard focus: lowering the sheet makes it inert, and a new
+  // view replaces it. Focus then moves to the handle instead of falling back to the page.
+  const handleRef = useRef<HTMLButtonElement>(null);
+  const focusWasInside = useRef(false);
+  useLayoutEffect(() => {
+    const active = document.activeElement;
+    const lostInside = active === document.body && focusWasInside.current;
+    const hiddenInside = snap === "peek" && contentRef.current?.contains(active);
+    if (lostInside || hiddenInside) handleRef.current?.focus({ preventScroll: true });
+  });
 
   // The screen and the content can also change size without a render (rotation, fonts).
   useLayoutEffect(() => {
@@ -98,7 +110,10 @@ export function BottomSheet({
     };
   }, [measure]);
 
-  const peekHeight = Math.min(HANDLE_HEIGHT + space.peek, space.available * MAX_PEEK_SHARE);
+  // Peek content taller than its share of the screen (short phones, large text) scrolls.
+  const maxPeek = space.available * MAX_PEEK_SHARE;
+  const peekOverflows = space.available > 0 && HANDLE_HEIGHT + space.peek > maxPeek;
+  const peekHeight = Math.min(HANDLE_HEIGHT + space.peek, maxPeek);
   const heights: Record<SheetSnap, number> = {
     peek: peekHeight,
     half: Math.max(space.available * HALF_SHARE, peekHeight),
@@ -165,6 +180,10 @@ export function BottomSheet({
       stop();
       const height = drag.height;
       if (height === null) return;
+      // The click that may follow this release belongs to the drag; later clicks do not.
+      setTimeout(() => {
+        draggedRef.current = false;
+      }, 0);
       const { heights: current, onSnapChange: settle } = latest.current;
       const nearest = ORDER.reduce((best, candidate) =>
         Math.abs(current[candidate] - height) < Math.abs(current[best] - height) ? candidate : best,
@@ -208,10 +227,21 @@ export function BottomSheet({
       data-snap={snap}
       data-dragging={dragHeight !== null || undefined}
       data-animated={animated || undefined}
+      data-peek-overflows={peekOverflows || undefined}
       aria-label={label}
+      onFocus={() => {
+        focusWasInside.current = true;
+      }}
+      onBlur={(event) => {
+        // Focus moved to something else on the page (not lost into nothing).
+        if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) {
+          focusWasInside.current = false;
+        }
+      }}
     >
       <div className={styles.grab} onPointerDown={onPointerDown}>
         <button
+          ref={handleRef}
           type="button"
           className={styles.handle}
           aria-label={
@@ -224,7 +254,11 @@ export function BottomSheet({
         >
           <span aria-hidden="true" />
         </button>
-        <div ref={peekRef} className={styles.peek}>
+        <div
+          ref={peekRef}
+          className={styles.peek}
+          style={peekOverflows ? { maxHeight: maxPeek - HANDLE_HEIGHT } : undefined}
+        >
           {peek}
         </div>
       </div>

@@ -100,6 +100,22 @@ describe("PlaceInput", () => {
     expect(changes.at(-1)).toEqual({ text: "den" });
   });
 
+  it("never offers suggestions that were found for different text", async () => {
+    vi.mocked(suggestPlaces).mockImplementation((query) =>
+      Promise.resolve(query.startsWith("sea") ? [DENVER] : []),
+    );
+    const user = userEvent.setup();
+    render(<Harness />);
+    const input = screen.getByRole("combobox", { name: "Destination" });
+
+    await user.type(input, "sea");
+    await screen.findByRole("option", { name: /Denver, CO/ });
+    await user.clear(input);
+    await user.type(input, "po");
+
+    expect(screen.queryByRole("option")).not.toBeInTheDocument();
+  });
+
   it("does not ask for suggestions for a single letter", async () => {
     const user = userEvent.setup();
     render(<Harness />);

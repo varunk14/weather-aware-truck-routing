@@ -138,6 +138,49 @@ describe("useTripPlanner", () => {
     expect(vi.mocked(planTrip).mock.calls[1]?.[0]).toEqual(vi.mocked(planTrip).mock.calls[0]?.[0]);
   });
 
+  it("shows a 400 that names no field on the form, so it is never silent", async () => {
+    vi.mocked(planTrip).mockRejectedValue(new ApiError("JSON parse error.", 400));
+    const { result } = setUp();
+
+    act(() => {
+      result.current.submit();
+    });
+
+    await waitFor(() => {
+      expect(result.current.errors.form).toBe("JSON parse error.");
+    });
+  });
+
+  it("tries again with the trip that failed, even after a later request was cancelled", async () => {
+    const calls = deferPlans();
+    const { result } = setUp();
+
+    act(() => {
+      result.current.submit();
+    });
+    await act(async () => {
+      calls[0]?.reject(new ApiError("The weather service is not responding.", 503));
+      await Promise.resolve();
+    });
+    const failedTrip = vi.mocked(planTrip).mock.calls[0]?.[0];
+
+    act(() => {
+      result.current.change({ ...validDraft(), load: "1000" }, "load");
+    });
+    act(() => {
+      result.current.submit();
+    });
+    act(() => {
+      result.current.cancel();
+    });
+    expect(result.current.state.status).toBe("error");
+
+    act(() => {
+      result.current.retry();
+    });
+    expect(vi.mocked(planTrip).mock.calls[2]?.[0]).toEqual(failedTrip);
+  });
+
   it("turns unexpected failures into a readable error", async () => {
     vi.mocked(planTrip).mockRejectedValue(new SyntaxError("Unexpected token"));
     const { result } = setUp();

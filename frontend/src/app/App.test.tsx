@@ -136,6 +136,20 @@ describe("App on a wide screen", () => {
     expect(screen.getByRole("region", { name: "Route A · mile 50" })).toBeInTheDocument();
   });
 
+  it("announces the recommendation once the plan is ready", async () => {
+    vi.mocked(planTrip).mockResolvedValue(tripPlan());
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    await planATrip(user);
+
+    await waitFor(() => {
+      expect(container.querySelector('[aria-live="polite"]')).toHaveTextContent(
+        "Routes ready. Recommended: Route B, 15 h 10 min. Avoids 50 mi of High-risk weather",
+      );
+    });
+  });
+
   it("explains a failed plan and can try again", async () => {
     vi.mocked(planTrip).mockRejectedValueOnce(
       new ApiError("The weather service is not responding. Try again in a moment.", 503),
@@ -186,6 +200,24 @@ describe("App on a phone", () => {
     await user.click(within(sheet).getByRole("button", { name: "Edit" }));
     expect(sheet).toHaveAttribute("data-snap", "full");
     await user.click(within(sheet).getByRole("button", { name: "Back to routes" }));
+    expect(sheet).toHaveAttribute("data-snap", "peek");
+  });
+
+  it("opens a new plan at the peek position again after the trip was edited", async () => {
+    vi.mocked(planTrip).mockResolvedValue(tripPlan());
+    usePhoneLayout();
+    const user = userEvent.setup();
+    render(<App />);
+    await planATrip(user);
+    const sheet = screen.getByRole("region", { name: "Trip" });
+    await screen.findByRole("region", { name: "Route B · 15 h 10 min" });
+
+    await user.click(within(sheet).getByRole("button", { name: "Show more of the trip panel" }));
+    expect(sheet).toHaveAttribute("data-snap", "half");
+    await user.click(within(sheet).getByRole("button", { name: "Edit" }));
+    await user.click(within(sheet).getByRole("button", { name: "Plan routes" }));
+
+    await screen.findByRole("region", { name: "Route B · 15 h 10 min" });
     expect(sheet).toHaveAttribute("data-snap", "peek");
   });
 

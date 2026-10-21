@@ -4,6 +4,7 @@ import { AppHeader } from "../components/AppHeader/AppHeader";
 import { Attribution } from "../components/Attribution/Attribution";
 import { BottomSheet, type SheetSnap } from "../components/BottomSheet/BottomSheet";
 import { EmptyState } from "../components/EmptyState/EmptyState";
+import { ErrorBoundary } from "../components/ErrorBoundary/ErrorBoundary";
 import type { MapPadding } from "../features/map/MapView";
 import { CheckpointDetails } from "../features/results/CheckpointDetails";
 import { ErrorState, LoadingState } from "../features/results/PlanStatus";
@@ -14,6 +15,7 @@ import { TripForm } from "../features/trip/TripForm";
 import { useTripPlanner } from "../features/trip/useTripPlanner";
 import { useApiStatus } from "../hooks/useApiStatus";
 import { PHONE_QUERY, useMediaQuery } from "../hooks/useMediaQuery";
+import { formatDuration } from "../lib/format";
 import { routeById } from "../lib/plan";
 import type { TripPlan } from "../lib/types";
 import styles from "./App.module.css";
@@ -21,7 +23,7 @@ import styles from "./App.module.css";
 // MapLibre is the largest dependency; loading it separately keeps the first paint fast.
 const MapView = lazy(() => import("../features/map/MapView"));
 
-/** What the phone's bottom sheet shows, and where it sits for each. */
+/** What the phone's bottom sheet shows, and where it starts for each. */
 type SheetView = "form" | "loading" | "error" | "results";
 const SHEET_START: Record<SheetView, SheetSnap> = {
   form: "full",
@@ -38,6 +40,14 @@ interface Selection {
   plan: TripPlan | null;
   routeId: string | null;
   checkpoint: number | null;
+}
+
+/** What a screen reader hears when a plan arrives (errors are announced by their alert). */
+function announce(plan: TripPlan | null): string {
+  if (!plan) return "";
+  const best = routeById(plan, plan.recommendation.route_id);
+  const duration = best ? `, ${formatDuration(best.duration_s)}` : "";
+  return `Routes ready. Recommended: Route ${plan.recommendation.route_id}${duration}. ${plan.recommendation.reason}`;
 }
 
 export function App() {
@@ -65,12 +75,14 @@ export function App() {
   else if (failed && !editing) view = "error";
   else if (plan && !editing) view = "results";
 
-  // Each view opens at its own position; the user can move the sheet from there.
-  const [sheet, setSheet] = useState<{ view: SheetView; snap: SheetSnap }>({
-    view: "form",
-    snap: "full",
-  });
-  const snap = sheet.view === view ? sheet.snap : SHEET_START[view];
+  // Every time the sheet shows something new it starts at that view's position; the user can
+  // move it from there.
+  const [sheetView, setSheetView] = useState<SheetView>(view);
+  const [snap, setSnap] = useState<SheetSnap>(SHEET_START[view]);
+  if (sheetView !== view) {
+    setSheetView(view);
+    setSnap(SHEET_START[view]);
+  }
   const [sheetHeight, setSheetHeight] = useState(0);
 
   const padding = useMemo<MapPadding>(
@@ -94,12 +106,12 @@ export function App() {
 
   function selectRoute(routeId: string) {
     setSelection({ plan, routeId, checkpoint: null });
-    if (phone) setSheet({ view, snap: "peek" });
+    if (phone) setSnap("peek");
   }
 
   function selectCheckpoint(checkpoint: number) {
     setSelection({ ...current, checkpoint });
-    if (phone) setSheet({ view, snap: "peek" });
+    if (phone) setSnap("peek");
   }
 
   const form = (
@@ -113,14 +125,23 @@ export function App() {
   );
 
   const results = plan && current.routeId && (
-    <TripResults
-      plan={plan}
-      selectedRouteId={current.routeId}
-      selectedCheckpoint={current.checkpoint}
-      onSelectRoute={selectRoute}
-      onSelectCheckpoint={selectCheckpoint}
-      showRecommendation={!phone}
-    />
+    <ErrorBoundary
+      resetKey={plan}
+      fallback={
+        <p className={styles.problem} role="alert">
+          This plan could not be shown. Try planning the trip again.
+        </p>
+      }
+    >
+      <TripResults
+        plan={plan}
+        selectedRouteId={current.routeId}
+        selectedCheckpoint={current.checkpoint}
+        onSelectRoute={selectRoute}
+        onSelectCheckpoint={selectCheckpoint}
+        showRecommendation={!phone}
+      />
+    </ErrorBoundary>
   );
 
   const loading = state.status === "loading" && state.startedAt !== null && (
@@ -139,41 +160,6 @@ export function App() {
       />
     </div>
   );
-
-  const map = (
-    <Suspense fallback={<div className={styles.mapLoading} aria-hidden="true" />}>
-      <MapView
-        plan={plan}
-        selectedRouteId={current.routeId}
-        selectedCheckpoint={current.checkpoint}
-        padding={padding}
-        onSelectRoute={selectRoute}
-        onSelectCheckpoint={selectCheckpoint}
-      />
-    </Suspense>
-  );
-
-  if (!phone) {
-    return (
-      <main className={styles.app}>
-        <div className={styles.header}>
-          <AppHeader apiStatus={apiStatus} />
-        </div>
-        <section className={styles.panel} aria-label="Trip planner">
-          {form}
-          {loading}
-          {failed && <ErrorState error={failed} onRetry={retry} />}
-          {results}
-          {state.status === "idle" && <EmptyState />}
-          <Attribution />
-        </section>
-        <div className={styles.mapArea}>
-          {map}
-          {details}
-        </div>
-      </main>
-    );
-  }
 
   const sheetContent: Record<SheetView, { peek: ReactNode; body: ReactNode }> = {
     form: {
@@ -239,26 +225,57 @@ export function App() {
     },
   };
 
+  // One tree for both layouts, so the map survives a rotation or resize across the breakpoint.
   return (
     <main className={styles.app}>
       <div className={styles.header}>
         <AppHeader apiStatus={apiStatus} />
       </div>
+      {phone ? null : (
+        <section className={styles.panel} aria-label="Trip planner">
+          {form}
+          {loading}
+          {failed && <ErrorState error={failed} onRetry={retry} />}
+          {results}
+          {state.status === "idle" && <EmptyState />}
+          <Attribution />
+        </section>
+      )}
       <div className={styles.mapArea}>
-        {map}
-        {details}
-        <BottomSheet
-          label="Trip"
-          snap={snap}
-          onSnapChange={(next) => {
-            setSheet({ view, snap: next });
-          }}
-          onHeightChange={setSheetHeight}
-          peek={sheetContent[view].peek}
+        <ErrorBoundary
+          fallback={
+            <div className={styles.mapProblem} role="region" aria-label="Route map">
+              <p>The map could not be loaded. Reload the page to try again.</p>
+            </div>
+          }
         >
-          {sheetContent[view].body}
-        </BottomSheet>
+          <Suspense fallback={<div className={styles.mapLoading} aria-hidden="true" />}>
+            <MapView
+              plan={plan}
+              selectedRouteId={current.routeId}
+              selectedCheckpoint={current.checkpoint}
+              padding={padding}
+              onSelectRoute={selectRoute}
+              onSelectCheckpoint={selectCheckpoint}
+            />
+          </Suspense>
+        </ErrorBoundary>
+        {details}
+        {phone && (
+          <BottomSheet
+            label="Trip"
+            snap={snap}
+            onSnapChange={setSnap}
+            onHeightChange={setSheetHeight}
+            peek={sheetContent[view].peek}
+          >
+            {sheetContent[view].body}
+          </BottomSheet>
+        )}
       </div>
+      <p className="visually-hidden" aria-live="polite">
+        {announce(plan)}
+      </p>
     </main>
   );
 }

@@ -79,7 +79,12 @@ describe("TripForm", () => {
     await user.click(screen.getByRole("radio", { name: "50 mi" }));
     await user.click(screen.getByRole("button", { name: "Plan routes" }));
 
-    expect(screen.getByRole("button", { name: "Planning routes…" })).toBeDisabled();
+    const button = screen.getByRole("button", { name: "Planning routes…" });
+    expect(button).toHaveAttribute("aria-disabled", "true");
+    expect(button).toHaveFocus();
+    // Pressing it again while planning does not send a second request.
+    await user.click(button);
+    expect(planTrip).toHaveBeenCalledTimes(1);
     const [trip] = vi.mocked(planTrip).mock.calls[0] ?? [];
     expect(trip).toMatchObject({
       origin: { query: "Seattle, WA" },

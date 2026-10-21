@@ -23,6 +23,8 @@ export interface PlanState {
   startedAt: number | null;
   /** While loading: the state to go back to if the request is cancelled. */
   previous: PlanState | null;
+  /** The trip this state belongs to, so "Try again" repeats the right one. */
+  trip: TripRequest | null;
 }
 
 const IDLE: PlanState = {
@@ -31,6 +33,7 @@ const IDLE: PlanState = {
   error: null,
   startedAt: null,
   previous: null,
+  trip: null,
 };
 
 /** Editing a place clears both place errors: "same place" is reported on the destination. */
@@ -48,7 +51,6 @@ export function useTripPlanner() {
   const [errors, setErrors] = useState<DraftErrors>({});
   const [state, setState] = useState<PlanState>(IDLE);
   const controllerRef = useRef<AbortController | null>(null);
-  const lastTripRef = useRef<TripRequest | null>(null);
 
   useEffect(
     () => () => {
@@ -61,7 +63,6 @@ export function useTripPlanner() {
     controllerRef.current?.abort();
     const controller = new AbortController();
     controllerRef.current = controller;
-    lastTripRef.current = trip;
 
     setState((current) => ({
       ...current,
@@ -69,13 +70,14 @@ export function useTripPlanner() {
       error: null,
       startedAt: Date.now(),
       previous: current.status === "loading" ? current.previous : current,
+      trip,
     }));
 
     planTrip(trip, controller.signal).then(
       (plan) => {
         if (controllerRef.current !== controller) return;
         controllerRef.current = null;
-        setState({ ...IDLE, status: "success", plan });
+        setState({ ...IDLE, status: "success", plan, trip });
       },
       (reason: unknown) => {
         if (isAbortError(reason) || controllerRef.current !== controller) return;
@@ -84,8 +86,12 @@ export function useTripPlanner() {
           reason instanceof ApiError
             ? reason
             : new ApiError("Something went wrong while planning the trip. Try again.", 0);
-        if (error.status === 400) setErrors(apiFieldErrors(error.fieldErrors));
-        setState({ ...IDLE, status: "error", error });
+        if (error.status === 400) {
+          const fields = apiFieldErrors(error.fieldErrors);
+          // A 400 that names no field still needs a message on the form.
+          setErrors(Object.keys(fields).length > 0 ? fields : { form: error.message });
+        }
+        setState({ ...IDLE, status: "error", error, trip });
       },
     );
   }, []);
@@ -105,8 +111,8 @@ export function useTripPlanner() {
   }, [draft, run]);
 
   const retry = useCallback(() => {
-    if (lastTripRef.current) run(lastTripRef.current);
-  }, [run]);
+    if (state.trip) run(state.trip);
+  }, [run, state.trip]);
 
   /** Stops the request and goes back to what was on screen before it. */
   const cancel = useCallback(() => {

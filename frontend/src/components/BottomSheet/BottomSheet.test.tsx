@@ -11,7 +11,7 @@ const PEEK_CONTENT_HEIGHT = 150;
 beforeEach(() => {
   // jsdom does no layout; give the sheet's container and peek content real sizes.
   vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(CONTAINER_HEIGHT);
-  vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(PEEK_CONTENT_HEIGHT);
+  vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockReturnValue(PEEK_CONTENT_HEIGHT);
 });
 
 afterEach(() => {
@@ -122,6 +122,46 @@ describe("BottomSheet", () => {
 
     expect(onClick).toHaveBeenCalled();
     expect(sheet()).not.toHaveAttribute("data-dragging");
+  });
+
+  it("moves the keyboard focus to the handle when the content it was on is lowered away", async () => {
+    function PickRoute() {
+      const [snap, setSnap] = useState<SheetSnap>("half");
+      return (
+        <div>
+          <BottomSheet label="Trip" snap={snap} onSnapChange={setSnap} peek="Trip summary">
+            <button
+              type="button"
+              onClick={() => {
+                setSnap("peek");
+              }}
+            >
+              Route B
+            </button>
+          </BottomSheet>
+        </div>
+      );
+    }
+    const user = userEvent.setup();
+    render(<PickRoute />);
+
+    screen.getByRole("button", { name: "Route B" }).focus();
+    await user.keyboard("{Enter}");
+
+    expect(sheet()).toHaveAttribute("data-snap", "peek");
+    expect(screen.getByRole("button", { name: "Show more of the trip panel" })).toHaveFocus();
+  });
+
+  it("lets peek content that is too tall scroll instead of cutting it off", () => {
+    vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockReturnValue(600);
+    render(<Harness />);
+
+    // 45% of the 800 px area, with the content capped below the 44 px handle.
+    expect(sheet()).toHaveStyle({ height: "360px" });
+    expect(sheet()).toHaveAttribute("data-peek-overflows");
+    expect(screen.getByRole("button", { name: "Edit" }).parentElement).toHaveStyle({
+      maxHeight: "316px",
+    });
   });
 
   it("reports its settled height", () => {
