@@ -217,6 +217,32 @@ overstate risk where samples cluster.
 ### 40. Built for phones as well as desktops
 
 Every screen works on phones from 360 px wide as well as on tablets and desktops: no horizontal
-scrolling, touch-sized controls, inputs large enough to avoid zoom on focus, and respect for the
-notch and home-indicator areas. On phones the header stays at the top and the map sits above the
-panel. The end-to-end tests run on a desktop and a mobile device profile.
+scrolling, touch targets of at least 44 px, inputs large enough to avoid zoom on focus, and respect
+for the notch and home-indicator areas. The end-to-end tests run on a desktop and a mobile device
+profile.
+
+### 41. A bottom sheet on phones
+
+On phones the map fills the screen and the trip sits in a sheet over it, as in map apps. The sheet
+has three positions: a peek with the trip summary and the recommendation, half height with the
+route cards, and full height with everything, including the trip form. Its handle is a button
+(tap to cycle, arrow keys to step) and it can also be dragged. Picking a route or a checkpoint
+lowers the sheet so the map shows it. Wider screens keep the side panel.
+
+### 42. Everything on the map is also in the panel
+
+Each route card gives distance, time, arrival and the miles at each risk level in numbers, and the
+selected route lists its checkpoints above Low risk. Picking one opens the same details as tapping
+it on the map, so the result can be read without the map, with a keyboard or a screen reader.
+
+### 43. Times are shown where they happen
+
+Departure and checkpoint arrival times are shown in the origin's local time and arrival at the
+destination in the destination's, each with its UTC offset, rather than in the viewer's time zone.
+The departure is entered in the viewer's own time, which the form says.
+
+### 44. Waiting is explained
+
+A plan takes about five to ten seconds, mostly for routing. The panel says what is happening, counts
+the seconds, says so if a service is slow, and can be cancelled. A cancelled request leaves the
+previous plan on screen.
