@@ -1,0 +1,17 @@
+.attribution {
+  margin-top: var(--space-5);
+  color: var(--color-text-3);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+
+.attribution a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--color-border-strong);
+  text-underline-offset: 2px;
+}
+
+.attribution a:hover {
+  color: var(--color-text-2);
+}

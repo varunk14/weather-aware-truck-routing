@@ -80,28 +80,29 @@ export function TripForm({ draft, errors, busy, onChange, onSubmit }: TripFormPr
         />
       </div>
 
+      <div className={fields.field}>
+        <label className={fields.label} htmlFor={departureId}>
+          Departure
+        </label>
+        <input
+          id={departureId}
+          className={fields.input}
+          type="datetime-local"
+          value={draft.departure}
+          aria-invalid={errors.departure ? true : undefined}
+          aria-describedby={errors.departure ? errorId("departure") : `${departureId}-hint`}
+          onChange={(event) => {
+            onChange({ ...draft, departure: event.target.value }, "departure");
+          }}
+        />
+        {fieldError("departure") ?? (
+          <p id={`${departureId}-hint`} className={fields.hint}>
+            Your local time
+          </p>
+        )}
+      </div>
+
       <div className={styles.pair}>
-        <div className={fields.field}>
-          <label className={fields.label} htmlFor={departureId}>
-            Departure
-          </label>
-          <input
-            id={departureId}
-            className={fields.input}
-            type="datetime-local"
-            value={draft.departure}
-            aria-invalid={errors.departure ? true : undefined}
-            aria-describedby={errors.departure ? errorId("departure") : `${departureId}-hint`}
-            onChange={(event) => {
-              onChange({ ...draft, departure: event.target.value }, "departure");
-            }}
-          />
-          {fieldError("departure") ?? (
-            <p id={`${departureId}-hint`} className={fields.hint}>
-              Your local time
-            </p>
-          )}
-        </div>
         <div className={fields.field}>
           <label className={fields.label} htmlFor={loadId}>
             Load weight (lb)
@@ -122,28 +123,27 @@ export function TripForm({ draft, errors, busy, onChange, onSubmit }: TripFormPr
           />
           {fieldError("load")}
         </div>
+        <fieldset className={styles.interval}>
+          <legend className={fields.label}>Checkpoint every</legend>
+          <div className={styles.segments}>
+            {INTERVALS.map((miles) => (
+              <label key={miles} className={styles.segment}>
+                <input
+                  type="radio"
+                  name={`${id}-interval`}
+                  value={miles}
+                  checked={draft.interval === miles}
+                  onChange={() => {
+                    onChange({ ...draft, interval: miles }, "interval");
+                  }}
+                />
+                <span>{miles} mi</span>
+              </label>
+            ))}
+          </div>
+          {fieldError("interval")}
+        </fieldset>
       </div>
-
-      <fieldset className={styles.interval}>
-        <legend className={fields.label}>Checkpoint every</legend>
-        <div className={styles.segments}>
-          {INTERVALS.map((miles) => (
-            <label key={miles} className={styles.segment}>
-              <input
-                type="radio"
-                name={`${id}-interval`}
-                value={miles}
-                checked={draft.interval === miles}
-                onChange={() => {
-                  onChange({ ...draft, interval: miles }, "interval");
-                }}
-              />
-              <span>{miles} mi</span>
-            </label>
-          ))}
-        </div>
-        {fieldError("interval")}
-      </fieldset>
 
       {errors.form && (
         <p className={styles.formError} role="alert">

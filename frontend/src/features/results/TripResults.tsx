@@ -14,6 +14,8 @@ interface TripResultsProps {
   selectedCheckpoint: number | null;
   onSelectRoute: (routeId: string) => void;
   onSelectCheckpoint: (index: number) => void;
+  /** Phones show the recommendation in the sheet's peek area instead. */
+  showRecommendation?: boolean;
 }
 
 export function TripResults({
@@ -22,12 +24,13 @@ export function TripResults({
   selectedCheckpoint,
   onSelectRoute,
   onSelectCheckpoint,
+  showRecommendation = true,
 }: TripResultsProps) {
   const routesId = useId();
   const selected = routeById(plan, selectedRouteId);
   return (
     <div className={styles.results}>
-      <Recommendation plan={plan} />
+      {showRecommendation && <Recommendation plan={plan} />}
       <section aria-labelledby={routesId}>
         <h3 id={routesId} className={styles.section}>
           <span>Routes</span>

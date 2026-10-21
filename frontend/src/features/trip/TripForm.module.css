@@ -79,7 +79,8 @@
 .segment {
   position: relative;
   display: grid;
-  min-height: 40px;
+  /* With the track's padding this matches the 44 px inputs beside it. */
+  min-height: 38px;
   place-items: center;
   border-radius: 7px;
   color: var(--color-text-2);
