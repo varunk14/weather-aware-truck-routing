@@ -123,8 +123,10 @@ export function App() {
 
   // The timeline shows with a plan's results; on a phone only with the sheet lowered, since any
   // higher it would cover most of the map.
+  // An open checkpoint's details take the top of a phone's map, so the timeline makes way.
   const showTimeline =
-    Boolean(plan && route) && (!phone || (view === "results" && snap === "peek"));
+    Boolean(plan && route) &&
+    (!phone || (view === "results" && snap === "peek" && current.checkpoint === null));
   // Hiding the timeline pauses it, so it never starts playing again by itself when it returns.
   if (!showTimeline && shownForecast.playing) {
     setForecast({ ...shownForecast, playing: false });
@@ -330,6 +332,7 @@ export function App() {
               layer={heatLayer}
               onLayerChange={setHeatLayer}
               routeId={route.id}
+              arrivalHour={(Date.parse(route.arrival) - Date.parse(route.departure)) / 3_600_000}
               truck={truck}
               heatmap={Boolean(plan.heatmap)}
             />

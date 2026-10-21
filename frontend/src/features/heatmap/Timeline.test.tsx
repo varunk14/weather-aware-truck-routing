@@ -15,6 +15,7 @@ function setup(overrides: Partial<Parameters<typeof Timeline>[0]> = {}) {
     onLayerChange: vi.fn(),
     routeId: "B",
     truck: { lngLat: [-121.5, 46.5] as [number, number], mile: 312.4, status: "driving" as const },
+    arrivalHour: 24.5,
     heatmap: true,
     ...overrides,
   };
@@ -28,7 +29,9 @@ describe("Timeline", () => {
 
     expect(screen.getByText("Thu, Oct 22, 14:30")).toBeInTheDocument();
     expect(screen.getByText("+6.5 h · UTC−7")).toBeInTheDocument();
-    expect(screen.getByText("Route B · truck at mile 312")).toBeInTheDocument();
+    expect(
+      screen.getByText("Route B · truck at mile 312 · arrives at +24.5 h"),
+    ).toBeInTheDocument();
     expect(screen.getByRole("slider", { name: "Forecast hours after departure" })).toHaveAttribute(
       "aria-valuetext",
       "Thu, Oct 22, 14:30, 6.5 h after departure",
@@ -37,7 +40,7 @@ describe("Timeline", () => {
 
   it("says when the truck has arrived", () => {
     setup({ truck: { lngLat: [-121, 46], mile: 100, status: "arrived" } });
-    expect(screen.getByText("Route B has arrived")).toBeInTheDocument();
+    expect(screen.getByText("Route B arrived at +24.5 h")).toBeInTheDocument();
   });
 
   it("moves the hour with the slider and stops playing", () => {

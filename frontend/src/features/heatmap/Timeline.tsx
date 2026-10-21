@@ -42,6 +42,8 @@ interface TimelineProps {
   onLayerChange: (layer: HeatLayer) => void;
   routeId: string;
   truck: TruckPosition | null;
+  /** Hours from departure to the selected route's arrival, marked on the slider. */
+  arrivalHour: number;
   /** False when the plan came without corridor weather. */
   heatmap: boolean;
 }
@@ -60,6 +62,7 @@ export function Timeline({
   onLayerChange,
   routeId,
   truck,
+  arrivalHour,
   heatmap,
 }: TimelineProps) {
   const moment = addHours(departure, hour);
@@ -93,8 +96,9 @@ export function Timeline({
   if (truck) {
     truckText =
       truck.status === "arrived"
-        ? `Route ${routeId} has arrived`
-        : `Route ${routeId} · truck at mile ${Math.round(truck.mile).toLocaleString("en-US")}`;
+        ? `Route ${routeId} arrived at ${formatHoursAhead(arrivalHour)}`
+        : `Route ${routeId} · truck at mile ${Math.round(truck.mile).toLocaleString("en-US")} · ` +
+          `arrives at ${formatHoursAhead(arrivalHour)}`;
   }
 
   return (
@@ -123,27 +127,37 @@ export function Timeline({
       </div>
 
       <div className={styles.slider}>
-        <input
-          type="range"
-          min={0}
-          max={MAX_HOUR}
-          step={STEP}
-          value={hour}
-          aria-label="Forecast hours after departure"
-          aria-valuetext={`${time}, ${formatHoursAhead(hour).slice(1)} after departure`}
-          style={{ "--fill": `${String((hour / MAX_HOUR) * 100)}%` } as CSSProperties}
-          onChange={(event) => {
-            onPlayingChange(false);
-            onHourChange(Number(event.target.value));
-          }}
-          onKeyDown={(event) => {
-            const by = KEY_STEPS[event.key];
-            if (by === undefined) return;
-            event.preventDefault();
-            onPlayingChange(false);
-            onHourChange(Math.min(Math.max(Math.round((hour + by) * 2) / 2, 0), MAX_HOUR));
-          }}
-        />
+        <div className={styles.track}>
+          {/* The slider runs 48 hours whatever the trip's length; this marks when it ends. */}
+          {arrivalHour < MAX_HOUR && (
+            <span
+              className={styles.arrival}
+              style={{ "--at": String(arrivalHour / MAX_HOUR) } as CSSProperties}
+              aria-hidden="true"
+            />
+          )}
+          <input
+            type="range"
+            min={0}
+            max={MAX_HOUR}
+            step={STEP}
+            value={hour}
+            aria-label="Forecast hours after departure"
+            aria-valuetext={`${time}, ${formatHoursAhead(hour).slice(1)} after departure`}
+            style={{ "--fill": `${String((hour / MAX_HOUR) * 100)}%` } as CSSProperties}
+            onChange={(event) => {
+              onPlayingChange(false);
+              onHourChange(Number(event.target.value));
+            }}
+            onKeyDown={(event) => {
+              const by = KEY_STEPS[event.key];
+              if (by === undefined) return;
+              event.preventDefault();
+              onPlayingChange(false);
+              onHourChange(Math.min(Math.max(Math.round((hour + by) * 2) / 2, 0), MAX_HOUR));
+            }}
+          />
+        </div>
         <div className={styles.ticks} aria-hidden="true">
           {TICKS.map((tick) => (
             <span key={tick}>{tick === MAX_HOUR ? `${String(tick)} h` : String(tick)}</span>

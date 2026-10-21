@@ -101,8 +101,13 @@ test("shows the forecast at a risky checkpoint", async ({ page, isMobile }) => {
   const details = page.getByRole("region", { name: "Route A · mile 450" });
   await expect(details).toBeVisible();
   await expect(details.getByRole("row", { name: /Rain/ })).toContainText("High");
+  // On a phone the details card takes the top of the map, so the timeline makes way for it.
+  const timeline = page.getByRole("region", { name: "Forecast timeline" });
+  if (isMobile) await expect(timeline).toBeHidden();
+  else await expect(timeline).toBeVisible();
   await details.getByRole("button", { name: "Close checkpoint details" }).click();
   await expect(details).toBeHidden();
+  await expect(timeline).toBeVisible();
 });
 
 test("explains when no truck route connects the places", async ({ page }) => {
@@ -252,9 +257,9 @@ test("scrubs the 48 hour forecast without asking the network", async ({ page }) 
   await slider.fill("6");
   await expect(timeline).toContainText("Thu, Oct 22, 14:00");
   await expect(timeline).toContainText("+6 h");
-  await expect(timeline).toContainText(/Route B · truck at mile \d+/);
+  await expect(timeline).toContainText(/Route B · truck at mile \d+ · arrives at \+[\d.]+ h/);
   await slider.fill("48");
-  await expect(timeline).toContainText("Route B has arrived");
+  await expect(timeline).toContainText(/Route B arrived at \+[\d.]+ h/);
 
   await timeline.getByRole("button", { name: "Wind" }).click();
   await expect(timeline.getByRole("img", { name: /^Wind scale: .* mph$/ })).toBeVisible();

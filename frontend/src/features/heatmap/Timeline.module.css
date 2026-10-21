@@ -78,7 +78,26 @@
   gap: 2px;
 }
 
+/* The arrival mark sits under the slider's thumb, at the arrival's place on the track. */
+.track {
+  position: relative;
+}
+
+.arrival {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--thumb) / 2 + (100% - var(--thumb)) * var(--at));
+  width: 3px;
+  height: 14px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
 .slider input {
+  position: relative;
+  display: block;
   width: 100%;
   height: var(--thumb);
   margin: 0;
