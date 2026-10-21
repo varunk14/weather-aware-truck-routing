@@ -205,8 +205,9 @@ batches are fetched in parallel with a 10 second timeout each.
 
 Open-Meteo's free tier allows 600 calls a minute, 5,000 an hour and 10,000 a day, and each
 forecast location counts as one call. Chicago to Denver needs 71 checkpoint locations at 50 mile
-spacing, 141 at 25 miles and 351 at 10 miles, and the heatmap adds at most 200 cells, so the
-daily limit covers about 30 new trips at the default spacing and the hourly limit about 15.
+spacing, 141 at 25 miles and 351 at 10 miles, and the heatmap adds at most 120 cells (see 49),
+so the daily limit covers about 38 new trips at the default spacing, the hourly limit about 19
+and the minute limit two.
 Plans and the corridor's forecast are cached for an hour, as long as an hourly forecast stays
 current, so repeating a trip costs nothing and a re-plan with another load or spacing fetches
 only the checkpoints. When Open-Meteo refuses a request, the API says which limit was reached:
@@ -289,11 +290,11 @@ only on Done; Cancel, Escape or a click outside leave it as it was.
 ### 46. The heatmap corridor
 
 The heatmap covers a corridor about three cells wide around all three routes. Cells start 20 km
-apart and grow until there are at most 200, the most one Open-Meteo request takes: a 250 mile
-trip keeps 20 km cells and a corridor about 60 km wide, a cross-country trip gets cells of about
-100 km and a corridor about 300 km wide, which shows the weather systems the routes pass through
-rather than conditions at the roadside. Frames are whole UTC
-hours from the hour of departure, 50 of them, which covers any moment in the first 48 hours.
+apart and grow in steps of 10 % until there are at most 120 (see 49): a 250 mile trip keeps
+20 km cells and a corridor about 60 km wide, a cross-country trip gets cells of about 135 km and
+a corridor about 400 km wide, which shows the weather systems the routes pass through rather
+than conditions at the roadside. Frames are whole UTC hours from the hour of departure, 50 of
+them, which covers any moment in the first 48 hours.
 
 ### 47. What the slider shows between hours
 
@@ -309,8 +310,20 @@ the map once per plan.
 The timeline shows where the truck on the selected route is at the slider's time, from the
 checkpoints' arrival times, so it moves at the pace TomTom expects, slower in traffic. The
 slider always runs 48 hours, the forecast window the specification asks for, so a shorter trip
-arrives part way along it: a mark on the track and the text ("arrives at +24.5 h") say when. Playing
-runs the 48 hours in 12 seconds. On a phone the timeline floats above the lowered sheet and hides
-while the sheet is raised or a checkpoint's details are open, when it would cover most of the
-map; hiding it pauses playing and
-hides the heatmap, which is never shown without its legend.
+arrives part way along it: a mark on the track and the text ("arrives at +24.5 h") say when.
+Playing runs the 48 hours in 12 seconds. On a phone the timeline floats above the lowered sheet
+and hides while the sheet is raised or a checkpoint's details are open, when it would cover most
+of the map; hiding it pauses playing and hides the heatmap, which is never shown without its
+legend.
+
+### 49. At most 120 heatmap cells
+
+Open-Meteo's free plan allows 600 calls a minute, one per forecast location. A plan's checkpoints
+need up to about 200 locations, and with 200 heatmap cells a long trip used about 400 calls, so
+a second new trip planned within the same minute came back without its heatmap (its routes and
+recommendation were unaffected). With at most 120 cells a plan uses about 250 to 320 calls and
+two new trips fit in a minute. The cost is coarser cells on long trips only (about 135 km instead
+of 95 km from Los Angeles to Houston); trips of a few hundred miles keep their 20 km cells, and
+the checkpoints, which decide the recommendation, are not affected. Repeating a trip within the
+hour costs nothing, since plans and corridor forecasts are cached. A paid Open-Meteo plan would
+remove the limit.

@@ -95,11 +95,13 @@ Weather comes from Open-Meteo, which needs no key.
 - Trips can start and end anywhere TomTom has truck routing, up to 3,500 miles apart. Units are
   US customary everywhere (miles, mph, inches, pounds), as in the specification. Very long trips
   (2,000 miles or more) can take up to about 20 seconds to plan; most trips take 3 to 5.
-- Open-Meteo's free tier allows 10,000 calls a day, counted per location. A cross-country trip
-  needs about 70 checkpoint locations at 50 mile spacing, 140 at 25 miles and 350 at 10 miles,
-  plus up to 200 heatmap cells, so the hosted demo handles roughly 30 new default trips a day.
-  Repeated trips are served from a one hour cache.
-- Heatmap cells grow with the trip, from 20 km on short trips to about 100 km across the
+- Open-Meteo's free tier allows 600 calls a minute and 10,000 a day, counted per location. A
+  cross-country trip needs about 70 checkpoint locations at 50 mile spacing, 140 at 25 miles and
+  350 at 10 miles, plus up to 120 heatmap cells, so the hosted demo handles two new trips a
+  minute and roughly 38 new default trips a day. A trip planned beyond that comes back without
+  its heatmap, or says the weather service is busy. Repeated trips are served from a one hour
+  cache.
+- Heatmap cells grow with the trip, from 20 km on short trips to about 135 km across the
   country, so local weather on a long trip is averaged over a large square. The checkpoints,
   which decide the recommendation, are not affected.
 
