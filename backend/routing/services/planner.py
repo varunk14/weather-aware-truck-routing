@@ -38,7 +38,9 @@ from routing.services.weather import Stop, Weather, weather_at_stops
 logger = logging.getLogger(__name__)
 
 GEOMETRY_TOLERANCE_M = 30
-PLAN_CACHE_S = 15 * 60
+# Forecasts are hourly and each forecast location counts against the weather quota, so a plan
+# is kept for an hour.
+PLAN_CACHE_S = 60 * 60
 # A plan whose heatmap could not be fetched is kept only briefly, so the heatmap returns soon.
 PLAN_WITHOUT_HEATMAP_CACHE_S = 60
 MIN_TRIP_M = 1_000
