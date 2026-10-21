@@ -60,7 +60,7 @@ risk summary. One route is recommended, with a sentence explaining why.
 | Field                   | Rules                                                                                                                                                                                  |
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `origin`, `destination` | Exactly one form: a picked suggestion (`place_id` + `place_type`), coordinates (`lat` + `lon`), or free text (`query`). They must be different places, at most 3,500 mi apart by road. |
-| `departure`             | ISO 8601. From 15 minutes ago up to 7 days ahead. A time without an offset is read as UTC.                                                                                             |
+| `departure`             | ISO 8601. From 15 minutes ago up to 10 days ahead. A time without an offset is read as UTC.                                                                                            |
 | `load_lb`               | Whole pounds, 1 to 80,000.                                                                                                                                                             |
 | `interval_mi`           | Checkpoint spacing: 10, 25 or 50. Default 25.                                                                                                                                          |
 

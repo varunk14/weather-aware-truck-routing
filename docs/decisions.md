@@ -68,9 +68,12 @@ individually to explain it.
 
 All times are handled in UTC and shown in the origin's local time with the time zone labelled.
 
-### 13. Departure within the next seven days
+### 13. Departure within the next ten days
 
-This keeps the whole trip and the 48 hour heatmap inside the forecast range.
+Open-Meteo forecasts 16 days ahead. Ten days leaves room for the longest trip allowed (3,500
+miles, about three days of driving) and the 48 hour heatmap, so every checkpoint has a forecast.
+Hourly forecasts more than about a week ahead are much less certain, so the form says so when
+the departure is that far out.
 
 ### 14. Load weight between 1 and 80,000 lb
 
@@ -170,7 +173,7 @@ Identical trips are cached for 15 minutes and place lookups for a day. Each clie
 ### 31. A departure a few minutes in the past is accepted
 
 The routing API itself accepts any past departure, so the API enforces the window: from 15
-minutes ago, so a form filled in at "now" is not rejected, up to 7 days ahead.
+minutes ago, so a form filled in at "now" is not rejected, up to 10 days ahead.
 
 ### 32. Weather for the hour the truck arrives
 
@@ -260,9 +263,9 @@ previous plan on screen.
 ### 45. A calendar for the departure
 
 The browser's own date picker cannot be styled and, on desktops, has no confirm button. The form
-uses its own calendar instead. The allowed days (now to seven days ahead) always fit in two
-weeks, so the calendar shows just those two weeks, with no month to page through; the first of a
-new month is labelled. The time is picked from buttons, hours and quarter hours with AM and PM,
-rather than drop-down lists, which the browser would draw in its own style; times that have
-passed are disabled. The departure changes only on Done; Cancel, Escape or a click outside leave
-it as it was. The arrow keys move between days and between times.
+uses its own picker, laid out like the browser's: a month calendar, with arrows to the next
+month, in which only the allowed days (now to ten days ahead) can be chosen, and a time typed or
+stepped like the browser's time input. The hour, minutes and AM or PM each take typed digits and
+the up and down arrows, with buttons above and below for a mouse or a finger. Any minute can be
+chosen. A time that has passed is marked and Done waits until it is fixed. The departure changes
+only on Done; Cancel, Escape or a click outside leave it as it was.
