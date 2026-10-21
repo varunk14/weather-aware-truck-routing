@@ -250,7 +250,7 @@ class TomTomClient:
                 response = self._http.request(
                     method, path, params=params, json=json, headers=headers
                 )
-            except httpx.TransportError as error:
+            except httpx.RequestError as error:
                 # The path never contains the key; the query string is not logged.
                 logger.warning("TomTom %s %s failed: %s", method, path, type(error).__name__)
             else:
