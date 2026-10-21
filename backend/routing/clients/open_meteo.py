@@ -43,6 +43,15 @@ class WeatherUnavailableError(WeatherError):
     """Open-Meteo timed out, failed, or is rate limiting requests."""
 
 
+class WeatherLimitError(WeatherUnavailableError):
+    """Open-Meteo refused the request: too many in the last minute, hour or day."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(f"Open-Meteo is rate limiting requests: {reason}")
+        # The free plan allows 10,000 calls a day; that limit lasts until the next UTC day.
+        self.daily = "daily" in reason.lower()
+
+
 @dataclass(frozen=True, slots=True)
 class HourlyForecast:
     """Hourly forecast for one point. ``times`` are whole UTC hours; a value may be missing.
@@ -127,7 +136,7 @@ class OpenMeteoClient:
                 logger.warning("Open-Meteo request failed: %s", type(error).__name__)
             else:
                 if response.status_code == 429:
-                    raise WeatherUnavailableError("Open-Meteo is rate limiting requests.")
+                    raise WeatherLimitError(_reason(response))
                 if response.status_code < 500:
                     return response
                 logger.warning("Open-Meteo returned %s", response.status_code)

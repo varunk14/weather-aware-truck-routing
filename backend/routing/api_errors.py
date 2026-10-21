@@ -7,7 +7,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import exception_handler as drf_exception_handler
 
-from routing.clients.open_meteo import WeatherError, WeatherUnavailableError
+from routing.clients.open_meteo import WeatherError, WeatherLimitError, WeatherUnavailableError
 from routing.clients.tomtom import (
     NoRouteFoundError,
     PlaceNotFoundError,
@@ -64,7 +64,18 @@ _UPSTREAM_ERRORS: tuple[tuple[type[Exception], int, str], ...] = (
 )
 
 
+# Open-Meteo's free plan allows 10,000 calls a day (each forecast location is one call).
+WEATHER_DAILY_LIMIT = (
+    "The free weather service has reached its daily limit. Plans work again after midnight UTC."
+)
+WEATHER_BUSY = "The weather service is busy. Try again in a minute."
+
+
 def exception_handler(exc: Exception, context: dict[str, Any]) -> Response | None:
+    if isinstance(exc, WeatherLimitError):
+        logger.warning("%s: %s", type(exc).__name__, exc)
+        detail = WEATHER_DAILY_LIMIT if exc.daily else WEATHER_BUSY
+        return Response({"detail": detail}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
     for error_type, status_code, detail in _UPSTREAM_ERRORS:
         if isinstance(exc, error_type):
             logger.warning("%s: %s", type(exc).__name__, exc)
