@@ -5,7 +5,7 @@ import type { TripPlan } from "../../lib/types";
 import { HazardList } from "./HazardList";
 import { Recommendation } from "./Recommendation";
 import styles from "./results.module.css";
-import { RiskLegend } from "./RiskVisuals";
+import { MarkerLegend, RiskLegend } from "./RiskVisuals";
 import { RouteCard } from "./RouteCard";
 
 interface TripResultsProps {
@@ -55,7 +55,10 @@ export function TripResults({
           onSelect={onSelectCheckpoint}
         />
       )}
-      <RiskLegend />
+      <div className={styles.legends}>
+        <RiskLegend />
+        <MarkerLegend />
+      </div>
     </div>
   );
 }

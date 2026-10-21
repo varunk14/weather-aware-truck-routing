@@ -115,15 +115,17 @@ export function addPlanLayers(map: MapLibreMap): void {
     source: SOURCES.checkpoints,
     paint: { "circle-radius": 16, "circle-opacity": 0 },
   });
+  // Start: a white dot ringed in navy. End: a solid navy dot ringed in white.
+  const isOrigin: ExpressionSpecification = ["==", ["get", "kind"], "origin"];
   map.addLayer({
     id: LAYERS.endpoints,
     type: "circle",
     source: SOURCES.endpoints,
     paint: {
-      "circle-color": NAVY,
-      "circle-radius": 7,
-      "circle-stroke-color": WHITE,
-      "circle-stroke-width": 2.5,
+      "circle-color": ["case", isOrigin, WHITE, NAVY],
+      "circle-radius": 8,
+      "circle-stroke-color": ["case", isOrigin, NAVY, WHITE],
+      "circle-stroke-width": ["case", isOrigin, 3.5, 2.5],
     },
   });
 }

@@ -93,6 +93,28 @@
   gap: 5px;
 }
 
+.legends {
+  display: grid;
+  gap: var(--space-2);
+}
+
+/* Start and end markers, drawn as on the map. */
+.legend li.start::before,
+.legend li.end::before {
+  width: 10px;
+  height: 10px;
+  box-sizing: border-box;
+}
+
+.legend li.start::before {
+  border: 2.5px solid var(--color-route-selected);
+  background: var(--color-route-casing);
+}
+
+.legend li.end::before {
+  background: var(--color-route-selected);
+}
+
 /* Recommendation */
 .recommendation,
 .recommendationUnsafe {

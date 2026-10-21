@@ -100,7 +100,7 @@ describe("TripResults", () => {
         reason: "Every route crosses No Travel conditions. Route B has the fewest (12 mi).",
         safe: false,
       },
-      notes: ["Only 2 distinct truck routes connect these places."],
+      notes: ["Only 2 distinct truck routes were found between these places."],
     });
     renderResults({ plan });
 
@@ -117,6 +117,11 @@ describe("TripResults", () => {
         .getAllByRole("listitem")
         .map((item) => item.textContent),
     ).toEqual(["Low", "Moderate", "High", "Severe", "No Travel"]);
+    expect(
+      within(screen.getByRole("list", { name: "Map markers" }))
+        .getAllByRole("listitem")
+        .map((item) => item.textContent),
+    ).toEqual(["Start", "End"]);
   });
 });
 
@@ -178,7 +183,7 @@ describe("LoadingState", () => {
     const onCancel = vi.fn();
     render(<LoadingState startedAt={Date.now()} onCancel={onCancel} />);
 
-    expect(screen.getByRole("status")).toHaveTextContent("usually takes 5 to 10 seconds");
+    expect(screen.getByRole("status")).toHaveTextContent("usually takes about 5 seconds");
     act(() => {
       vi.advanceTimersByTime(SLOW_AFTER_S * 1000);
     });

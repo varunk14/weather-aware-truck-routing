@@ -39,7 +39,7 @@ export function LoadingState({ startedAt, onCancel }: LoadingStateProps) {
       <p className={styles.loadingText} role="status">
         {slow
           ? "Still working. The routing or weather service is slow right now."
-          : "Finding routes, then checking the weather at every checkpoint. This usually takes 5 to 10 seconds."}
+          : "Finding routes, then checking the weather at every checkpoint. This usually takes about 5 seconds; very long trips take up to 20."}
       </p>
       <p className={styles.elapsed} aria-hidden="true">
         {seconds} s

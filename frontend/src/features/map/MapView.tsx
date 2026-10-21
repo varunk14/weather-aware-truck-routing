@@ -91,9 +91,9 @@ export default function MapView({
   const route = plan ? routeById(plan, selectedRouteId) : undefined;
 
   // The map's event handlers are bound once; they read the latest props through this ref.
-  const latest = useRef({ route, onSelectRoute, onSelectCheckpoint });
+  const latest = useRef({ plan, route, onSelectRoute, onSelectCheckpoint });
   useEffect(() => {
-    latest.current = { route, onSelectRoute, onSelectCheckpoint };
+    latest.current = { plan, route, onSelectRoute, onSelectCheckpoint };
   });
 
   useEffect(() => {
@@ -125,20 +125,32 @@ export default function MapView({
       if (typeof id === "string") latest.current.onSelectRoute?.(id);
     });
 
-    // A short summary under the pointer on devices that can hover; taps open the full details.
+    // A short label under the pointer; taps and clicks open the full details. Whether the
+    // device can hover is checked each time, since a window can switch between mouse and touch.
     const tooltip = new Popup({ closeButton: false, closeOnClick: false, offset: 12 });
-    const canHover = window.matchMedia("(hover: hover)").matches;
+    const canHover = () => window.matchMedia("(hover: hover)").matches;
     map.on("mousemove", LAYERS.checkpointHit, (event) => {
       map.getCanvas().style.cursor = "pointer";
       const index = featureProperty(map, event, LAYERS.checkpointHit, "index");
       const summary =
-        canHover && typeof index === "number" && latest.current.route
+        canHover() && typeof index === "number" && latest.current.route
           ? checkpointSummary(latest.current.route, index)
           : null;
       if (summary) tooltip.setLngLat(event.lngLat).setText(summary).addTo(map);
     });
     map.on("mouseleave", LAYERS.checkpointHit, () => {
       map.getCanvas().style.cursor = "";
+      tooltip.remove();
+    });
+    map.on("mousemove", LAYERS.endpoints, (event) => {
+      const kind = featureProperty(map, event, LAYERS.endpoints, "kind");
+      const plan = latest.current.plan;
+      if (!canHover() || !plan) return;
+      const label =
+        kind === "origin" ? `Start: ${plan.origin.title}` : `End: ${plan.destination.title}`;
+      tooltip.setLngLat(event.lngLat).setText(label).addTo(map);
+    });
+    map.on("mouseleave", LAYERS.endpoints, () => {
       tooltip.remove();
     });
     map.on("mouseenter", LAYERS.routeAlternativeHit, () => {

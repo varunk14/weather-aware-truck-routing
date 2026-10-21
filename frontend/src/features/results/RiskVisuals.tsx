@@ -48,3 +48,13 @@ export function RiskLegend() {
     </ul>
   );
 }
+
+/** The route's end markers, as drawn on the map. */
+export function MarkerLegend() {
+  return (
+    <ul className={styles.legend} aria-label="Map markers">
+      <li className={styles.start}>Start</li>
+      <li className={styles.end}>End</li>
+    </ul>
+  );
+}

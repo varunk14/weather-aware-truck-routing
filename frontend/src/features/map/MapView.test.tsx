@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TripPlan } from "../../lib/types";
 import { tripPlan } from "../../test/fixtures";
+import { mediaQueryList } from "../../test/media";
 import { BASEMAP_STYLE_URL } from "./mapConfig";
 import { boundsOf, checkpointsData, planBounds, routesData } from "./mapData";
 import { LAYERS, SOURCES } from "./mapLayers";
@@ -20,6 +21,7 @@ const mapInstance = vi.hoisted(() => {
     listeners,
     sources,
     renderedFeatures: new Map<string, unknown[]>(),
+    tooltips: [] as string[],
     addControl: vi.fn(),
     addLayer: vi.fn(),
     addSource: vi.fn((id: string) => {
@@ -40,7 +42,8 @@ vi.mock("maplibre-gl", () => {
     setLngLat() {
       return this;
     }
-    setText() {
+    setText(text: string) {
+      mapInstance.tooltips.push(text);
       return this;
     }
     addTo() {
@@ -117,6 +120,7 @@ beforeEach(() => {
   mapInstance.listeners.length = 0;
   mapInstance.sources.clear();
   mapInstance.renderedFeatures.clear();
+  mapInstance.tooltips.length = 0;
   stubWebGL(true);
 });
 
@@ -297,6 +301,40 @@ describe("MapView", () => {
 
     click({});
     expect(onSelectRoute).toHaveBeenCalledTimes(1);
+  });
+
+  it("labels checkpoints and the start and end under the pointer, where the device can hover", () => {
+    const hover = vi
+      .spyOn(window, "matchMedia")
+      .mockImplementation((query: string) =>
+        mediaQueryList(query, () => query === "(hover: hover)"),
+      );
+    render(<MapView plan={tripPlan()} selectedRouteId="A" />);
+    loadMap();
+    const move = (layer: string, properties: Record<string, unknown>) => {
+      mapInstance.renderedFeatures.set(layer, [{ properties }]);
+      for (const listener of mapInstance.listeners) {
+        if (listener.event === "mousemove" && listener.layer === layer) {
+          listener.handler({ point: { x: 1, y: 1 }, lngLat: { lng: 0, lat: 0 } });
+        }
+      }
+    };
+
+    move(LAYERS.checkpointHit, { index: 1 });
+    move(LAYERS.endpoints, { kind: "origin" });
+    move(LAYERS.endpoints, { kind: "destination" });
+
+    expect(mapInstance.tooltips).toEqual([
+      "Mile 50 · High (rain) · 09:00 UTC\u22127",
+      "Start: Seattle, WA",
+      "End: Salt Lake City, UT",
+    ]);
+
+    // A device that cannot hover (a touch screen) gets no labels; taps open the details.
+    hover.mockImplementation((query: string) => mediaQueryList(query, () => false));
+    mapInstance.tooltips.length = 0;
+    move(LAYERS.checkpointHit, { index: 1 });
+    expect(mapInstance.tooltips).toEqual([]);
   });
 
   it("explains the problem instead of crashing when WebGL is unavailable", () => {
