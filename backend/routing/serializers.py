@@ -1,5 +1,6 @@
 """Request validation and response shapes for the trip planning API."""
 
+from collections.abc import Sequence
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -9,6 +10,7 @@ from rest_framework import serializers
 from routing.clients.tomtom import Place
 from routing.geo import METERS_PER_MILE
 from routing.risk import RiskLevel, RouteRisk
+from routing.services.heatmap import FRAME_COUNT, Heatmap
 from routing.services.places import Address, Coordinates, Location, PlaceRef
 from routing.services.planner import (
     ROUTE_IDS,
@@ -101,7 +103,33 @@ def plan_to_json(plan: RoutePlan) -> dict[str, Any]:
             "safe": plan.recommendation.is_safe,
         },
         "notes": _notes(plan),
+        "heatmap": _heatmap_json(plan.heatmap) if plan.heatmap else None,
     }
+
+
+def _heatmap_json(heatmap: Heatmap) -> dict[str, Any]:
+    """Hourly frames per cell as plain lists, which keeps 240 cells x 50 hours compact."""
+    return {
+        "start": heatmap.start.isoformat(),
+        "frames": FRAME_COUNT,
+        "spacing_m": round(heatmap.spacing_m),
+        "cell_size": {"lat": round(heatmap.lat_step, 5), "lon": round(heatmap.lon_step, 5)},
+        "cells": [
+            {
+                "lat": round(cell.position.lat, 4),
+                "lon": round(cell.position.lon, 4),
+                "risk": [None if level is None else int(level) for level in cell.risk],
+                "wind": _rounded(cell.wind_mph, 1),
+                "rain": _rounded(cell.rain_in_per_hr, 3),
+                "snow": _rounded(cell.snow_in_per_hr, 3),
+            }
+            for cell in heatmap.cells
+        ],
+    }
+
+
+def _rounded(values: Sequence[float | None], digits: int) -> list[float | None]:
+    return [None if value is None else round(value, digits) for value in values]
 
 
 def _place_json(place: Place) -> dict[str, Any]:

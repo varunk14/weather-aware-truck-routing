@@ -3,8 +3,9 @@ import { Map as MapLibreMap, setWorkerUrl } from "maplibre-gl";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TripPlan } from "../../lib/types";
-import { tripPlan } from "../../test/fixtures";
+import { heatmap as heatmapFixture, tripPlan } from "../../test/fixtures";
 import { mediaQueryList } from "../../test/media";
+import { colorExpression, framePosition, heatmapData, opacityExpression } from "../heatmap/heatmap";
 import { BASEMAP_STYLE_URL } from "./mapConfig";
 import { boundsOf, checkpointsData, planBounds, routesData } from "./mapData";
 import { LAYERS, SOURCES } from "./mapLayers";
@@ -22,6 +23,7 @@ const mapInstance = vi.hoisted(() => {
     sources,
     renderedFeatures: new Map<string, unknown[]>(),
     tooltips: [] as string[],
+    markers: [] as { lngLat: unknown; removed: boolean }[],
     addControl: vi.fn(),
     addLayer: vi.fn(),
     addSource: vi.fn((id: string) => {
@@ -34,6 +36,7 @@ const mapInstance = vi.hoisted(() => {
     getStyle: vi.fn(() => ({ layers: [{ id: "place-labels", type: "symbol" }] })),
     getZoom: vi.fn(() => 4),
     remove: vi.fn(),
+    setPaintProperty: vi.fn(),
   };
 });
 
@@ -53,7 +56,25 @@ vi.mock("maplibre-gl", () => {
       return this;
     }
   }
+  class MockMarker {
+    record = { lngLat: null as unknown, removed: false };
+    constructor() {
+      mapInstance.markers.push(this.record);
+    }
+    setLngLat(lngLat: unknown) {
+      this.record.lngLat = lngLat;
+      return this;
+    }
+    addTo() {
+      return this;
+    }
+    remove() {
+      this.record.removed = true;
+      return this;
+    }
+  }
   return {
+    Marker: MockMarker,
     Map: vi.fn(function MockMap() {
       return {
         ...mapInstance,
@@ -121,6 +142,7 @@ beforeEach(() => {
   mapInstance.sources.clear();
   mapInstance.renderedFeatures.clear();
   mapInstance.tooltips.length = 0;
+  mapInstance.markers.length = 0;
   stubWebGL(true);
 });
 
@@ -152,8 +174,12 @@ describe("MapView", () => {
     loadMap();
 
     expect(region).toHaveAttribute("aria-busy", "false");
-    expect(mapInstance.addSource).toHaveBeenCalledTimes(3);
-    // Route lines go under the basemap labels; checkpoints and endpoints on top.
+    expect(mapInstance.addSource).toHaveBeenCalledTimes(4);
+    // The heatmap and route lines go under the basemap labels; checkpoints and endpoints on top.
+    expect(mapInstance.addLayer).toHaveBeenCalledWith(
+      expect.objectContaining({ id: LAYERS.heatmap }),
+      "place-labels",
+    );
     expect(mapInstance.addLayer).toHaveBeenCalledWith(
       expect.objectContaining({ id: LAYERS.routeSelected }),
       "place-labels",
@@ -344,5 +370,65 @@ describe("MapView", () => {
 
     expect(screen.getByRole("region", { name: "Route map" })).toHaveTextContent(/needs WebGL/);
     expect(MapLibreMap).not.toHaveBeenCalled();
+  });
+  it("uploads the heatmap once and only repaints it as the slider moves", () => {
+    const plan = tripPlan();
+    const { rerender } = render(<MapView plan={plan} selectedRouteId="B" hour={0} />);
+    loadMap();
+
+    expect(lastData(SOURCES.heatmap)).toEqual(heatmapData(plan.heatmap));
+    const uploads = mapInstance.sources.get(SOURCES.heatmap)?.setData.mock.calls.length;
+    const heatmap = heatmapFixture();
+    const position = framePosition(heatmap, "2026-10-22T08:00:00-07:00", 4.5);
+
+    rerender(<MapView plan={plan} selectedRouteId="B" hour={4.5} heatLayer="rain" />);
+
+    expect(mapInstance.sources.get(SOURCES.heatmap)?.setData.mock.calls.length).toBe(uploads);
+    expect(mapInstance.setPaintProperty).toHaveBeenLastCalledWith(
+      LAYERS.heatmap,
+      "fill-opacity",
+      opacityExpression("rain", position),
+    );
+    expect(mapInstance.setPaintProperty).toHaveBeenCalledWith(
+      LAYERS.heatmap,
+      "fill-color",
+      colorExpression("rain", position),
+    );
+  });
+
+  it("hides the heatmap when there is no layer to show", () => {
+    const plan = tripPlan();
+    const { rerender } = render(<MapView plan={plan} heatLayer="risk" />);
+    loadMap();
+
+    rerender(<MapView plan={plan} heatLayer={null} />);
+
+    expect(mapInstance.setPaintProperty).toHaveBeenLastCalledWith(
+      LAYERS.heatmap,
+      "fill-opacity",
+      0,
+    );
+  });
+
+  it("draws nothing for a plan that came without a heatmap", () => {
+    render(<MapView plan={tripPlan({ heatmap: null })} hour={5} />);
+    loadMap();
+
+    expect(lastData(SOURCES.heatmap)).toEqual(heatmapData(null));
+    expect(mapInstance.setPaintProperty).not.toHaveBeenCalled();
+  });
+
+  it("shows the truck where it is told and hides it when there is none", () => {
+    const plan = tripPlan();
+    const { rerender } = render(<MapView plan={plan} truck={[-122, 47]} />);
+    loadMap();
+
+    expect(mapInstance.markers).toEqual([{ lngLat: [-122, 47], removed: false }]);
+
+    rerender(<MapView plan={plan} truck={[-121.5, 46.5]} />);
+    expect(mapInstance.markers).toEqual([{ lngLat: [-121.5, 46.5], removed: false }]);
+
+    rerender(<MapView plan={plan} truck={null} />);
+    expect(mapInstance.markers[0]?.removed).toBe(true);
   });
 });

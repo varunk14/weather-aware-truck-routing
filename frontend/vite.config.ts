@@ -22,6 +22,8 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
+    // Dates are shown in the viewer's own format; tests pin US English so they pass in any locale.
+    env: { LANG: "en_US.UTF-8", LC_ALL: "en_US.UTF-8" },
     setupFiles: ["./src/test/setup.ts"],
     include: ["src/**/*.test.{ts,tsx}"],
     coverage: {

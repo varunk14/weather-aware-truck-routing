@@ -133,7 +133,10 @@ without a key.
 
 ### 24. Heatmap frames load together
 
-All 0 to 48 hour frames arrive in one response, so moving the slider never waits on the network.
+All 0 to 48 hour frames arrive with the plan, so moving the slider never waits on the network.
+The corridor's weather is one Open-Meteo request, made at the same time as the checkpoints'
+request, so it adds little to the planning time. If only that request fails, the plan is still
+returned without a heatmap and the timeline says so.
 
 ### 25. Hosting
 
@@ -196,10 +199,12 @@ batches are fetched in parallel with a 10 second timeout each.
 ### 34. The weather quota
 
 Open-Meteo's free tier allows 600 calls a minute, 5,000 an hour and 10,000 a day; Clearway counts
-each location as one call. Chicago to Denver needs 71 locations at 50 mile spacing, 141 at 25
-miles and 351 at 10 miles, so the daily limit covers about 70 trips at the default spacing. Plans
-are cached for 15 minutes, and if Open-Meteo starts rate limiting, the API says the weather
-service is busy instead of failing silently.
+each location as one call. Chicago to Denver needs 71 checkpoint locations at 50 mile spacing,
+141 at 25 miles and 351 at 10 miles, and the heatmap adds at most 200 cells, so the daily limit
+covers about 30 new trips at the default spacing, and the hourly limit about 15. Plans and the corridor's forecast are cached
+for 15 minutes, so a re-plan of the same trip with another load or spacing fetches only the
+checkpoints, and if Open-Meteo starts rate limiting, the API says the weather service is busy
+instead of failing silently.
 
 ### 35. Machine-readable risk levels
 
@@ -225,7 +230,10 @@ shown by colour alone: every level is also named.
 ### 39. The heatmap shows true levels
 
 Each location on the heatmap shows its actual risk level, rather than a density blend that would
-overstate risk where samples cluster.
+overstate risk where samples cluster. The corridor is a grid of square cells that tile without
+overlapping, each coloured by the level the checkpoint rules give for its own weather and the
+trip's load; a heatmap that adds up nearby points was tried and rejected, as was a layer of
+overlapping soft circles, where the overlaps came out darker than the cells themselves.
 
 ### 40. Built for phones as well as desktops
 
@@ -269,3 +277,32 @@ stepped like the browser's time input. The hour, minutes and AM or PM each take 
 the up and down arrows, with buttons above and below for a mouse or a finger. Any minute can be
 chosen. A time that has passed is marked and Done waits until it is fixed. The departure changes
 only on Done; Cancel, Escape or a click outside leave it as it was.
+
+### 46. The heatmap corridor
+
+The heatmap covers a corridor about three cells wide around all three routes. Cells start 20 km
+apart and grow until there are at most 200, the most one Open-Meteo request takes: a 250 mile
+trip keeps 20 km cells and a corridor about 60 km wide, a cross-country trip gets cells of about
+100 km and a corridor about 300 km wide, which shows the weather systems the routes pass through
+rather than conditions at the roadside. Frames are whole UTC
+hours from the hour of departure, 50 of them, which covers any moment in the first 48 hours.
+
+### 47. What the slider shows between hours
+
+Dragging the slider moves it in tenths of an hour; the arrow keys move it half an hour, Page Up
+and Page Down six hours, Home and End to the ends. Wind, rain and snow are blended between the two hourly
+frames around the slider's time. Risk is a level, not a quantity, so it is not blended: it comes
+from the frame whose hour contains the slider's time, the same rule the checkpoints use for rain
+and snow. Moving the slider only changes the map's colour expression; the frames are uploaded to
+the map once per plan.
+
+### 48. The truck on the timeline
+
+The timeline shows where the truck on the selected route is at the slider's time, from the
+checkpoints' arrival times, so it moves at the pace TomTom expects, slower in traffic. The
+slider always runs 48 hours, the forecast window the specification asks for, so a shorter trip
+arrives part way along it: a mark on the track and the text ("arrives at +24.5 h") say when. Playing
+runs the 48 hours in 12 seconds. On a phone the timeline floats above the lowered sheet and hides
+while the sheet is raised or a checkpoint's details are open, when it would cover most of the
+map; hiding it pauses playing and
+hides the heatmap, which is never shown without its legend.

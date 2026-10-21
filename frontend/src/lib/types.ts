@@ -83,6 +83,27 @@ export interface Recommendation {
   safe: boolean;
 }
 
+/** One corridor cell: a value per hourly frame, null where the forecast had none. */
+export interface HeatmapCell {
+  lat: number;
+  lon: number;
+  /** Risk score per frame, 0 (Low) to 4 (No Travel). */
+  risk: (number | null)[];
+  wind: (number | null)[];
+  rain: (number | null)[];
+  snow: (number | null)[];
+}
+
+/** Frame ``i`` is the weather at ``start`` plus ``i`` hours. */
+export interface Heatmap {
+  start: string;
+  frames: number;
+  spacing_m: number;
+  /** A cell's size in degrees; cells are squares on the ground that tile the corridor. */
+  cell_size: { lat: number; lon: number };
+  cells: HeatmapCell[];
+}
+
 export interface TripPlan {
   origin: PlacePoint;
   destination: PlacePoint;
@@ -91,4 +112,6 @@ export interface TripPlan {
   routes: PlannedRoute[];
   recommendation: Recommendation;
   notes: string[];
+  /** Null when the corridor weather could not be fetched; the routes are still planned. */
+  heatmap: Heatmap | null;
 }

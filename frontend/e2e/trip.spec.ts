@@ -3,7 +3,9 @@ import { readFileSync } from "node:fs";
 import { expect, type Page, type Route, test } from "@playwright/test";
 
 // A real plan recorded from the API (TomTom routes, Open-Meteo forecast): Seattle to Salt Lake
-// City, 42,000 lb, every 25 mi. Route B is recommended; Route A has High rain at mile 450.
+// City, 42,000 lb, every 25 mi. Route B is recommended; Route A has High rain at mile 450. Its
+// heatmap was added by hand: 0.5 degree cells along the routes, Moderate wind east of 118 W
+// from 10 to 20 hours after departure.
 const PLAN: unknown = JSON.parse(
   readFileSync(new URL("./fixtures/plan-seattle-salt-lake-city.json", import.meta.url), "utf8"),
 );
@@ -99,8 +101,13 @@ test("shows the forecast at a risky checkpoint", async ({ page, isMobile }) => {
   const details = page.getByRole("region", { name: "Route A · mile 450" });
   await expect(details).toBeVisible();
   await expect(details.getByRole("row", { name: /Rain/ })).toContainText("High");
+  // On a phone the details card takes the top of the map, so the timeline makes way for it.
+  const timeline = page.getByRole("region", { name: "Forecast timeline" });
+  if (isMobile) await expect(timeline).toBeHidden();
+  else await expect(timeline).toBeVisible();
   await details.getByRole("button", { name: "Close checkpoint details" }).click();
   await expect(details).toBeHidden();
+  await expect(timeline).toBeVisible();
 });
 
 test("explains when no truck route connects the places", async ({ page }) => {
@@ -192,6 +199,25 @@ test.describe("on a phone", () => {
     for (const size of sizes) expect(size).toBeGreaterThanOrEqual(44);
   });
 
+  test("gives the forecast timeline touch targets of at least 44 px", async ({ page }) => {
+    await mockApi(page, (route) => route.fulfill({ json: PLAN }));
+    await page.goto("/");
+    await fillTrip(page);
+    await page.getByRole("button", { name: "Plan routes" }).click();
+
+    const timeline = page.getByRole("region", { name: "Forecast timeline" });
+    await expect(timeline).toBeVisible();
+    const sizes = await timeline
+      .getByRole("button")
+      .evaluateAll((elements) =>
+        elements.map((element) => Math.round(element.getBoundingClientRect().height)),
+      );
+    expect(sizes).toHaveLength(5);
+    for (const size of sizes) expect(size).toBeGreaterThanOrEqual(44);
+    const slider = await timeline.getByRole("slider").boundingBox();
+    expect(Math.round(slider?.height ?? 0)).toBeGreaterThanOrEqual(44);
+  });
+
   test("gives every day and time in the calendar a touch target of at least 44 px", async ({
     page,
   }) => {
@@ -208,6 +234,40 @@ test.describe("on a phone", () => {
     expect(sizes.length).toBeGreaterThan(30);
     for (const size of sizes) expect(size).toBeGreaterThanOrEqual(44);
   });
+});
+
+test("scrubs the 48 hour forecast without asking the network", async ({ page }) => {
+  await mockApi(page, (route) => route.fulfill({ json: PLAN }));
+  await page.goto("/");
+  await fillTrip(page);
+  await page.getByRole("button", { name: "Plan routes" }).click();
+
+  const timeline = page.getByRole("region", { name: "Forecast timeline" });
+  await expect(timeline).toContainText("Thu, Oct 22, 08:00");
+  await expect(timeline).toContainText("+0 h");
+  const requests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/api/") && !request.url().includes("/api/health")) {
+      requests.push(request.url());
+    }
+  });
+
+  const slider = timeline.getByRole("slider", { name: "Forecast hours after departure" });
+  for (const hours of ["6", "12.5", "30", "48", "0"]) await slider.fill(hours);
+  await slider.fill("6");
+  await expect(timeline).toContainText("Thu, Oct 22, 14:00");
+  await expect(timeline).toContainText("+6 h");
+  await expect(timeline).toContainText(/Route B · truck at mile \d+ · arrives at \+[\d.]+ h/);
+  await slider.fill("48");
+  await expect(timeline).toContainText(/Route B arrived at \+[\d.]+ h/);
+
+  await timeline.getByRole("button", { name: "Wind" }).click();
+  await expect(timeline.getByRole("img", { name: /^Wind scale: .* mph$/ })).toBeVisible();
+  await timeline.getByRole("button", { name: "Play the next 48 hours" }).click();
+  await expect(timeline.getByRole("button", { name: "Pause" })).toBeVisible();
+  await expect(timeline).not.toContainText("+0 h");
+
+  expect(requests).toEqual([]);
 });
 
 test("never scrolls sideways once a plan is shown", async ({ page }) => {

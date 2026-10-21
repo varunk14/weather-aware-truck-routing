@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  addHours,
   formatClock,
   formatDay,
   formatDuration,
@@ -60,6 +61,17 @@ describe("local times", () => {
 
   it("rejects times without an offset", () => {
     expect(() => formatDay("2026-10-22T08:00:00")).toThrow(RangeError);
+  });
+});
+
+describe("addHours", () => {
+  it.each([
+    ["2026-10-22T08:00:00-07:00", 6.5, "2026-10-22T14:30-07:00"],
+    ["2026-10-22T20:00:00-07:00", 5, "2026-10-23T01:00-07:00"],
+    ["2026-10-22T08:00:00+05:30", 0.25, "2026-10-22T08:15+05:30"],
+    ["2026-10-22T08:00:00Z", 48, "2026-10-24T08:00Z"],
+  ])("moves %s by %d hours, keeping its offset", (iso, hours, expected) => {
+    expect(addHours(iso, hours)).toBe(expected);
   });
 });
 

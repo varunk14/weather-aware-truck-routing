@@ -4,12 +4,14 @@ import { RISK_COLORS, RISK_LEVELS } from "../../lib/risk";
 import { emptyData } from "./mapData";
 
 export const SOURCES = {
+  heatmap: "clearway-heatmap",
   routes: "clearway-routes",
   checkpoints: "clearway-checkpoints",
   endpoints: "clearway-endpoints",
 } as const;
 
 export const LAYERS = {
+  heatmap: "clearway-heatmap",
   routeAlternative: "clearway-route-alternative",
   routeAlternativeHit: "clearway-route-alternative-hit",
   routeCasing: "clearway-route-casing",
@@ -35,8 +37,9 @@ const isAlternative: ExpressionSpecification = ["==", ["get", "selected"], false
 const lineLayout = { "line-cap": "round", "line-join": "round" } as const;
 
 /**
- * Adds the trip's sources and layers. Route lines go under the basemap's labels so place names
- * stay readable; checkpoints and endpoints go on top so they are easy to see and tap.
+ * Adds the trip's sources and layers. The heatmap and the route lines go under the basemap's
+ * labels so place names stay readable, the heatmap lowest; checkpoints and endpoints go on top
+ * so they are easy to see and tap.
  */
 export function addPlanLayers(map: MapLibreMap): void {
   const labels = map.getStyle().layers.find((layer) => layer.type === "symbol")?.id;
@@ -45,6 +48,17 @@ export function addPlanLayers(map: MapLibreMap): void {
     map.addSource(id, { type: "geojson", data: emptyData() });
   }
 
+  // Colour and opacity are set from the slider; until then the cells are invisible.
+  map.addLayer(
+    {
+      id: LAYERS.heatmap,
+      type: "fill",
+      source: SOURCES.heatmap,
+      // No outlines or edge smoothing, so neighbouring squares meet without a visible seam.
+      paint: { "fill-color": "rgba(0, 0, 0, 0)", "fill-antialias": false },
+    },
+    labels,
+  );
   map.addLayer(
     {
       id: LAYERS.routeAlternative,

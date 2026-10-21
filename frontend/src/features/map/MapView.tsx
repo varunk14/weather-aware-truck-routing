@@ -5,6 +5,7 @@ import {
   type LngLatBoundsLike,
   Map as MapLibreMap,
   type MapMouseEvent,
+  Marker,
   NavigationControl,
   type PaddingOptions,
   Popup,
@@ -17,6 +18,13 @@ import { formatClock, formatOffset } from "../../lib/format";
 import { routeById } from "../../lib/plan";
 import { describeCauses, RISK_LABELS } from "../../lib/risk";
 import type { PlannedRoute, TripPlan } from "../../lib/types";
+import {
+  colorExpression,
+  framePosition,
+  type HeatLayer,
+  heatmapData,
+  opacityExpression,
+} from "../heatmap/heatmap";
 import { BASEMAP_STYLE_URL, INITIAL_BOUNDS, isWebGLAvailable } from "./mapConfig";
 import { boundsOf, checkpointsData, endpointsData, planBounds, routesData } from "./mapData";
 import { addPlanLayers, LAYERS, SOURCES } from "./mapLayers";
@@ -48,6 +56,23 @@ interface MapViewProps {
   padding?: MapPadding;
   onSelectRoute?: (routeId: string) => void;
   onSelectCheckpoint?: (index: number) => void;
+  /** Which weather the corridor heatmap shows, or null to hide it (no timeline to explain it). */
+  heatLayer?: HeatLayer | null;
+  /** Hours after departure shown by the heatmap (the slider). */
+  hour?: number;
+  /** Where the truck is at that hour, or null to hide it. */
+  truck?: [number, number] | null;
+}
+
+/** A navy tile with a white truck, unlike the round start and end markers. */
+function truckElement(): HTMLElement {
+  const element = document.createElement("div");
+  element.className = styles.truck ?? "";
+  element.setAttribute("aria-hidden", "true");
+  element.innerHTML =
+    '<svg viewBox="0 0 24 24"><path d="M3 7h10v8H3zM13 10h4l3 3v2h-7z"/>' +
+    '<circle cx="7" cy="17" r="1.8"/><circle cx="17" cy="17" r="1.8"/></svg>';
+  return element;
 }
 
 function cameraDuration(): number {
@@ -83,6 +108,9 @@ export default function MapView({
   padding = DEFAULT_PADDING,
   onSelectRoute,
   onSelectCheckpoint,
+  heatLayer = "risk",
+  hour = 0,
+  truck = null,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -183,6 +211,39 @@ export default function MapView({
     const map = mapRef.current;
     if (map && loaded) setSourceData(map, SOURCES.endpoints, endpointsData(plan));
   }, [loaded, plan]);
+
+  // The heatmap's frames are uploaded once per plan; the slider only repaints them.
+  const heatmap = plan?.heatmap ?? null;
+  const departure = plan?.routes[0]?.departure ?? null;
+  useEffect(() => {
+    const map = mapRef.current;
+    if (map && loaded) setSourceData(map, SOURCES.heatmap, heatmapData(heatmap));
+  }, [loaded, heatmap]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !loaded || !heatmap || !departure) return;
+    if (!heatLayer) {
+      map.setPaintProperty(LAYERS.heatmap, "fill-opacity", 0);
+      return;
+    }
+    const position = framePosition(heatmap, departure, hour);
+    map.setPaintProperty(LAYERS.heatmap, "fill-color", colorExpression(heatLayer, position));
+    map.setPaintProperty(LAYERS.heatmap, "fill-opacity", opacityExpression(heatLayer, position));
+  }, [loaded, heatmap, departure, heatLayer, hour]);
+
+  const truckMarker = useRef<Marker | null>(null);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !loaded) return;
+    if (!truck) {
+      truckMarker.current?.remove();
+      truckMarker.current = null;
+      return;
+    }
+    truckMarker.current ??= new Marker({ element: truckElement() }).setLngLat(truck).addTo(map);
+    truckMarker.current.setLngLat(truck);
+  }, [loaded, truck]);
 
   // Move the camera: to all routes when a plan arrives, to a route when the user picks another,
   // to a checkpoint when one is picked. The move is applied once the padding has settled.
