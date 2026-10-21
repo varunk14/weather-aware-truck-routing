@@ -132,9 +132,8 @@ describe("TripForm", () => {
     render(<Planner />);
 
     expect(screen.getByRole("radio", { name: "25 mi" })).toBeChecked();
-    const departure = screen.getByLabelText<HTMLInputElement>("Departure");
-    expect(new Date(departure.value).getTime()).toBeGreaterThan(Date.now());
-    expect(new Date(departure.value).getMinutes()).toBe(0);
-    expect(departure).toHaveAccessibleDescription(/^Leaves .+ \(your local time\)$/);
+    const departure = screen.getByRole("button", { name: /^Departure / });
+    expect(departure).toHaveAccessibleName(/:00\s(AM|PM)$/);
+    expect(departure).toHaveAccessibleDescription("Your local time");
   });
 });

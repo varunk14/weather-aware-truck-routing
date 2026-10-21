@@ -116,10 +116,10 @@ export function apiFieldErrors(fieldErrors: Readonly<Record<string, string>>): D
   return errors;
 }
 
-/** The earliest and latest departure allowed, as datetime-local values for the calendar. */
-export function departureWindow(now: Date): { min: string; max: string } {
+/** The earliest and latest departure allowed. */
+export function departureBounds(now: Date): { earliest: Date; latest: Date } {
   return {
-    min: toDatetimeLocal(new Date(now.getTime() - DEPARTURE_GRACE_MS)),
-    max: toDatetimeLocal(new Date(now.getTime() + MAX_DAYS_AHEAD * DAY_MS)),
+    earliest: new Date(now.getTime() - DEPARTURE_GRACE_MS),
+    latest: new Date(now.getTime() + MAX_DAYS_AHEAD * DAY_MS),
   };
 }
