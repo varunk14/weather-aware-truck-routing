@@ -15,6 +15,11 @@
   outline-offset: -2px;
 }
 
+/* The credits' links are underlined, so they are told apart from the text around them. */
+.map :global(.maplibregl-ctrl-attrib a) {
+  text-decoration: underline;
+}
+
 /* Touch screens zoom with gestures; the buttons only take up space there. */
 @media (pointer: coarse) {
   .map :global(.maplibregl-ctrl-top-left) {
