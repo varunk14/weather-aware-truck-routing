@@ -9,7 +9,10 @@ import type { Interval, LocationInput, TripRequest } from "../../lib/types";
 
 export const INTERVALS: readonly Interval[] = [10, 25, 50];
 export const MAX_LOAD_LB = 80_000;
-export const MAX_DAYS_AHEAD = 7;
+// Open-Meteo forecasts 16 days ahead; ten leave room for the longest trip and the heatmap.
+export const MAX_DAYS_AHEAD = 10;
+// Beyond about a week, hourly forecasts are much less certain; the form says so.
+export const RELIABLE_FORECAST_DAYS = 7;
 const DEPARTURE_GRACE_MS = 15 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -122,4 +125,9 @@ export function departureBounds(now: Date): { earliest: Date; latest: Date } {
     earliest: new Date(now.getTime() - DEPARTURE_GRACE_MS),
     latest: new Date(now.getTime() + MAX_DAYS_AHEAD * DAY_MS),
   };
+}
+
+/** Whether a departure is far enough ahead that its forecast is much less certain. */
+export function beyondReliableForecast(departure: Date, now: Date): boolean {
+  return departure.getTime() > now.getTime() + RELIABLE_FORECAST_DAYS * DAY_MS;
 }

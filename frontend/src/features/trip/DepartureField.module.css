@@ -2,14 +2,16 @@
   position: relative;
 }
 
-/* The trigger and the calendar under it, which opens as wide as the field. */
-.anchor {
-  position: relative;
-}
-
 /* The calendar covers the note under the field; hide it so no edge shows past its corners. */
 .field[data-open] .note {
   visibility: hidden;
+}
+
+/* The trigger and the calendar under it, which opens as wide as the field. */
+.anchor {
+  position: relative;
+
+  --cell: 36px;
 }
 
 .trigger {
@@ -42,8 +44,8 @@
   right: 0;
   left: 0;
   display: grid;
-  gap: var(--space-4);
-  padding: var(--space-4);
+  gap: var(--space-3);
+  padding: var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--color-surface);
@@ -58,30 +60,75 @@
   }
 }
 
-.section {
+/* Calendar */
+.calendar {
   display: grid;
-  gap: var(--space-2);
+  min-width: 0;
+  align-content: start;
+  gap: var(--space-1);
 }
 
-.section + .section {
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--color-border);
+.header {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-bottom: var(--space-1);
 }
 
-.title {
+.month {
+  flex: 1;
+  padding-left: var(--space-2);
   font-size: var(--text-md);
   font-weight: 600;
 }
 
-/* Days */
+.step {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  place-items: center;
+  transition: background var(--duration-fast);
+}
+
+.step:hover:not(:disabled) {
+  background: var(--color-surface-2);
+}
+
+.step:disabled {
+  color: var(--color-border-strong);
+  cursor: default;
+}
+
+.step svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
 .weekdays,
 .days {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: var(--space-1);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  column-gap: 2px;
+}
+
+.days {
+  row-gap: 2px;
 }
 
 .weekdays span {
+  padding: 2px 0;
   color: var(--color-text-3);
   font-size: var(--text-sm);
   font-weight: 500;
@@ -90,46 +137,30 @@
 
 .day {
   position: relative;
-  height: 40px;
+  height: var(--cell);
   padding: 0;
   border: 0;
-  border-radius: var(--radius-md);
+  border-radius: 7px;
   background: transparent;
   color: var(--color-text);
   cursor: pointer;
   font-size: var(--text-md);
   font-variant-numeric: tabular-nums;
-  font-weight: 500;
-  transition:
-    background var(--duration-fast),
-    color var(--duration-fast);
+  transition: background var(--duration-fast);
 }
 
 .day:hover:not(:disabled, [aria-pressed="true"]) {
   background: var(--color-surface-2);
 }
 
-/* Today: a small dot under the date. */
-.day[data-today]::after {
-  position: absolute;
-  bottom: 5px;
-  left: 50%;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: var(--color-accent);
-  content: "";
-  transform: translateX(-50%);
+.day[data-outside]:not(:disabled) {
+  color: var(--color-text-3);
 }
 
 .day[aria-pressed="true"] {
   background: var(--color-accent);
   color: var(--color-accent-text);
-  font-weight: 700;
-}
-
-.day[aria-pressed="true"][data-today]::after {
-  background: var(--color-accent-text);
+  font-weight: 600;
 }
 
 .day:disabled {
@@ -137,129 +168,51 @@
   cursor: default;
 }
 
-.day:disabled[data-today]::after {
-  background: var(--color-border-strong);
+/* Today, outlined as in the browser's calendar. */
+.day[data-today]:not([aria-pressed="true"]) {
+  box-shadow: inset 0 0 0 1px var(--color-accent);
 }
 
 .day:focus-visible {
   outline-offset: 1px;
 }
 
-/* Names the month where a new one starts, when the two weeks span two months. */
-.monthTag {
-  position: absolute;
-  top: 2px;
-  left: 50%;
-  color: var(--color-accent);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  transform: translateX(-50%);
-}
-
-.day[aria-pressed="true"] .monthTag {
-  color: var(--color-accent-text);
-}
-
 /* Time */
-.timeHeader {
+.time {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
 }
 
-.chips {
-  display: grid;
-  gap: var(--space-1);
-}
-
-.chip {
-  min-height: 36px;
-  padding: 0;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-text);
-  cursor: pointer;
+.timeLabel {
+  padding-left: var(--space-2);
   font-size: var(--text-md);
-  font-variant-numeric: tabular-nums;
-  font-weight: 500;
-  transition:
-    background var(--duration-fast),
-    border-color var(--duration-fast),
-    color var(--duration-fast);
-}
-
-.chip:hover:not(:disabled, [aria-checked="true"]) {
-  border-color: var(--color-border-strong);
-  background: var(--color-surface-2);
-}
-
-.chips .chip[aria-checked="true"] {
-  border-color: var(--color-accent);
-  background: var(--color-accent);
-  color: var(--color-accent-text);
-  font-weight: 700;
-}
-
-.chip:disabled {
-  border-color: transparent;
-  background: var(--color-surface-2);
-  color: var(--color-border-strong);
-  cursor: default;
-}
-
-.chip:focus-visible {
-  outline-offset: 1px;
-}
-
-/* AM and PM, as a segmented control. */
-.segments {
-  display: grid;
-  padding: 3px;
-  border-radius: var(--radius-md);
-  background: var(--color-surface-2);
-}
-
-.segments .chip {
-  min-width: 48px;
-  min-height: 30px;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--color-text-2);
-  font-size: var(--text-sm);
   font-weight: 600;
 }
 
-.segments .chip:hover:not(:disabled, [aria-checked="true"]) {
-  background: transparent;
-  color: var(--color-text);
-}
-
-.segments .chip[aria-checked="true"] {
-  background: var(--color-surface);
-  box-shadow: 0 1px 3px rgb(13 30 45 / 14%);
-  color: var(--color-text);
-}
-
-.segments .chip:disabled {
-  background: transparent;
-  color: var(--color-border-strong);
+.problem {
+  margin-top: calc(var(--space-1) * -1);
+  color: var(--color-error);
+  font-size: var(--text-sm);
+  text-align: right;
 }
 
 /* Actions */
 .actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
 }
 
 .cancel,
 .done {
-  min-height: 44px;
-  padding: 0 var(--space-4);
+  min-height: 36px;
   border-radius: var(--radius-md);
   cursor: pointer;
   font-size: var(--text-md);
@@ -267,6 +220,12 @@
   transition:
     background var(--duration-fast),
     border-color var(--duration-fast);
+}
+
+.cancel,
+.done {
+  min-width: 80px;
+  padding: 0 var(--space-4);
 }
 
 .cancel {
@@ -286,15 +245,28 @@
   color: var(--color-accent-text);
 }
 
-.done:hover {
+.done:hover:not([aria-disabled="true"]) {
   background: color-mix(in srgb, var(--color-accent) 88%, black);
 }
 
-/* Touch screens: every day, time and action at least 44 px tall. */
+.done[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Touch screens: every day, time and button at least 44 px tall. */
 @media (pointer: coarse) {
-  .day,
-  .chip,
-  .segments .chip {
+  .anchor {
+    --cell: 44px;
+  }
+
+  .step {
+    width: 44px;
+    height: 44px;
+  }
+
+  .cancel,
+  .done {
     min-height: 44px;
   }
 }

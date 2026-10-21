@@ -28,17 +28,23 @@ function Harness({ start = "2026-10-21T19:00", onChange = vi.fn() }) {
 
 const trigger = () => screen.getByRole("button", { name: /^Departure/ });
 const dialog = () => screen.getByRole("dialog", { name: "Choose the departure" });
+const spin = (name: "Hour" | "Minutes" | "AM or PM") =>
+  within(dialog()).getByRole("spinbutton", { name });
+const shownTime = () =>
+  ["Hour", "Minutes", "AM or PM"]
+    .map((name) => within(dialog()).getByRole("spinbutton", { name }).textContent)
+    .join(" ");
 
 describe("departureBounds", () => {
-  it("runs from 15 minutes ago to seven days ahead", () => {
+  it("runs from 15 minutes ago to ten days ahead", () => {
     const { earliest, latest } = departureBounds(NOW);
     expect(earliest).toEqual(new Date(2026, 9, 21, 17, 52));
-    expect(latest).toEqual(new Date(2026, 9, 28, 18, 7));
+    expect(latest).toEqual(new Date(2026, 9, 31, 18, 7));
   });
 });
 
 describe("DepartureField", () => {
-  it("shows the departure and opens the two weeks that hold the allowed days", async () => {
+  it("shows the departure and opens a month in which only the allowed days can be picked", async () => {
     const user = userEvent.setup();
     render(<Harness />);
 
@@ -49,13 +55,13 @@ describe("DepartureField", () => {
     const calendar = dialog();
     expect(within(calendar).getByText("October 2026")).toBeInTheDocument();
     const days = within(calendar).getAllByRole("button", { name: /day, / });
-    expect(days).toHaveLength(14);
-    expect(days[0]).toHaveAccessibleName("Sunday, October 18");
-    expect(days[13]).toHaveAccessibleName("Saturday, October 31");
+    expect(days).toHaveLength(42);
+    expect(days[0]).toHaveAccessibleName("Sunday, September 27");
     expect(within(calendar).getByRole("button", { name: "Tuesday, October 20" })).toBeDisabled();
-    expect(within(calendar).getByRole("button", { name: "Wednesday, October 28" })).toBeEnabled();
-    expect(within(calendar).getByRole("button", { name: "Thursday, October 29" })).toBeDisabled();
+    expect(within(calendar).getByRole("button", { name: "Saturday, October 31" })).toBeEnabled();
+    expect(within(calendar).getByRole("button", { name: "Sunday, November 1" })).toBeDisabled();
     expect(within(calendar).getByRole("button", { name: "Wednesday, October 21" })).toHaveFocus();
+    expect(shownTime()).toBe("07 00 PM");
   });
 
   it("changes the departure only when Done is pressed", async () => {
@@ -65,11 +71,12 @@ describe("DepartureField", () => {
 
     await user.click(trigger());
     await user.click(within(dialog()).getByRole("button", { name: "Saturday, October 24" }));
-    await user.click(within(dialog()).getByRole("radio", { name: "30 minutes" }));
+    await user.click(spin("Minutes"));
+    await user.keyboard("37");
     expect(onChange).not.toHaveBeenCalled();
     await user.click(within(dialog()).getByRole("button", { name: "Done" }));
 
-    expect(onChange).toHaveBeenCalledWith("2026-10-24T19:30");
+    expect(onChange).toHaveBeenCalledWith("2026-10-24T19:37");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(trigger()).toHaveFocus();
   });
@@ -112,51 +119,76 @@ describe("DepartureField", () => {
     render(<Harness />);
 
     await user.click(trigger());
-    await user.keyboard("{ArrowRight}{ArrowDown}");
+    await user.keyboard("{ArrowRight}{ArrowDown}{ArrowDown}");
 
-    expect(within(dialog()).getByRole("button", { name: "Thursday, October 29" })).toBeDisabled();
-    // Wednesday 28 (a week after Thursday 22 would be outside the window) is as far as it goes.
-    expect(within(dialog()).getByRole("button", { name: "Thursday, October 22" })).toHaveAttribute(
+    // Thursday 29 is in the window; a week later is not, so the second press goes nowhere.
+    expect(within(dialog()).getByRole("button", { name: "Thursday, October 29" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
   });
 
-  it("does not offer times that have already passed today", async () => {
+  it("takes a typed time, moving on from the hour to the minutes to AM or PM", async () => {
     const user = userEvent.setup();
-    render(<Harness />);
+    const onChange = vi.fn();
+    render(<Harness start="2026-10-22T19:00" onChange={onChange} />);
 
     await user.click(trigger());
-    const hours = within(dialog()).getByRole("radiogroup", { name: "Hour" });
+    await user.click(spin("Hour"));
+    await user.keyboard("11");
+    expect(spin("Minutes")).toHaveFocus();
+    await user.keyboard("5");
+    expect(shownTime()).toBe("11 05 PM");
+    await user.keyboard("9");
+    expect(spin("AM or PM")).toHaveFocus();
+    await user.keyboard("a");
+    expect(shownTime()).toBe("11 59 AM");
 
-    expect(within(hours).getByRole("radio", { name: "5 PM" })).toBeDisabled();
-    expect(within(hours).getByRole("radio", { name: "6 PM" })).toBeEnabled();
-    expect(within(hours).getByRole("radio", { name: "7 PM" })).toBeChecked();
-    expect(within(dialog()).getByRole("radio", { name: "AM" })).toBeDisabled();
+    await user.click(within(dialog()).getByRole("button", { name: "Done" }));
+    expect(onChange).toHaveBeenCalledWith("2026-10-22T11:59");
   });
 
-  it("moves the time with the arrow keys, skipping times that have passed", async () => {
+  it("steps each part up and down, with the arrow keys or the buttons", async () => {
+    const user = userEvent.setup();
+    render(<Harness start="2026-10-22T23:59" />);
+
+    await user.click(trigger());
+    await user.click(spin("Minutes"));
+    await user.keyboard("{ArrowUp}");
+    expect(shownTime()).toBe("11 00 PM");
+    await user.keyboard("{ArrowDown}{ArrowDown}");
+    expect(shownTime()).toBe("11 58 PM");
+
+    await user.click(within(dialog()).getByRole("button", { name: "Increase hour" }));
+    expect(shownTime()).toBe("12 58 PM");
+    expect(spin("Hour")).toHaveFocus();
+    await user.click(within(dialog()).getByRole("button", { name: "Decrease am or pm" }));
+    expect(shownTime()).toBe("12 58 AM");
+  });
+
+  it("will not take a time that has passed", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     render(<Harness onChange={onChange} />);
 
     await user.click(trigger());
-    within(dialog()).getByRole("radio", { name: "7 PM" }).focus();
-    await user.keyboard("{ArrowLeft}{ArrowLeft}");
-    const hours = within(dialog()).getByRole("radiogroup", { name: "Hour" });
-    // 6 PM is the earliest hour left today, so the second press goes nowhere.
-    expect(within(hours).getByRole("radio", { name: "6 PM" })).toBeChecked();
-    expect(within(hours).getByRole("radio", { name: "6 PM" })).toHaveFocus();
+    await user.click(spin("Hour"));
+    await user.keyboard("5");
 
-    await user.keyboard("{ArrowRight}{ArrowDown}");
-    expect(within(hours).getByRole("radio", { name: "1 PM" })).not.toBeChecked();
-    expect(within(hours).getByRole("radio", { name: "7 PM" })).toBeChecked();
-
+    expect(within(dialog()).getByRole("alert")).toHaveTextContent("That time has already passed.");
+    expect(spin("Hour")).toHaveAttribute("aria-invalid", "true");
     await user.click(within(dialog()).getByRole("button", { name: "Done" }));
-    expect(onChange).toHaveBeenCalledWith("2026-10-21T19:00");
+    expect(onChange).not.toHaveBeenCalled();
+    expect(dialog()).toBeInTheDocument();
+
+    // A later day makes the same time fine.
+    await user.click(within(dialog()).getByRole("button", { name: "Thursday, October 22" }));
+    expect(within(dialog()).queryByRole("alert")).not.toBeInTheDocument();
+    await user.click(within(dialog()).getByRole("button", { name: "Done" }));
+    expect(onChange).toHaveBeenCalledWith("2026-10-22T17:00");
   });
 
-  it("names the new month when the two weeks span two", async () => {
+  it("pages to the next month when the allowed days run into it", async () => {
     const user = userEvent.setup();
     render(
       <DepartureField
@@ -167,10 +199,21 @@ describe("DepartureField", () => {
     );
 
     await user.click(trigger());
-    expect(within(dialog()).getByText(/October\s.\sNovember 2026/)).toBeInTheDocument();
-    expect(within(dialog()).getByRole("button", { name: "Wednesday, November 4" })).toBeEnabled();
-    expect(within(dialog()).getByRole("button", { name: "Sunday, November 1" })).toHaveTextContent(
-      "Nov1",
+    expect(within(dialog()).getByText("October 2026")).toBeInTheDocument();
+    expect(within(dialog()).getByRole("button", { name: "Previous month" })).toBeDisabled();
+    await user.click(within(dialog()).getByRole("button", { name: "Next month" }));
+
+    expect(within(dialog()).getByText("November 2026")).toBeInTheDocument();
+    expect(within(dialog()).getByRole("button", { name: "Next month" })).toBeDisabled();
+    expect(within(dialog()).getByRole("button", { name: "Saturday, November 7" })).toBeEnabled();
+    expect(within(dialog()).getByRole("button", { name: "Sunday, November 8" })).toBeDisabled();
+  });
+
+  it("says when the forecast that far ahead is less certain", () => {
+    render(<DepartureField value="2026-10-30T09:00" onChange={() => undefined} now={NOW} />);
+
+    expect(trigger()).toHaveAccessibleDescription(
+      "Your local time. Forecasts more than a week ahead are less certain.",
     );
   });
 

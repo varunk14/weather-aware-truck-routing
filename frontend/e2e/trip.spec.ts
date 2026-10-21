@@ -202,7 +202,9 @@ test.describe("on a phone", () => {
 
     const sizes = await calendar
       .locator("button")
-      .evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect().height));
+      .evaluateAll((elements) =>
+        elements.map((element) => Math.round(element.getBoundingClientRect().height)),
+      );
     expect(sizes.length).toBeGreaterThan(30);
     for (const size of sizes) expect(size).toBeGreaterThanOrEqual(44);
   });

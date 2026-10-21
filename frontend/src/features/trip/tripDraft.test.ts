@@ -75,9 +75,13 @@ describe("validateDraft", () => {
   it.each([
     ["", "Enter a departure date and time."],
     ["2026-10-21T09:00", "Departure must be now or later."],
-    ["2026-10-28T10:00", "Departure must be within the next 7 days."],
+    ["2026-10-31T10:00", "Departure must be within the next 10 days."],
   ])("checks the departure %j", (departure, message) => {
     expect(validateDraft(draft({ departure }), NOW).departure).toBe(message);
+  });
+
+  it("accepts a departure nine days ahead", () => {
+    expect(validateDraft(draft({ departure: "2026-10-30T09:00" }), NOW)).toEqual({});
   });
 
   it("accepts a departure a few minutes ago, like the API", () => {
