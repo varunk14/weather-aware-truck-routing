@@ -18,6 +18,11 @@
   --color-accent-text: #ffffff;
   --color-focus: #008080;
 
+  /* Feedback: error text, borders and notices (AA on the panel background). */
+  --color-error: #b42323;
+  --color-error-bg: #fdf1f0;
+  --color-warning-bg: #fff6e0;
+
   /* Map */
   --color-route-selected: #0d1e2d;
   --color-route-alt: #9aa8b3;
