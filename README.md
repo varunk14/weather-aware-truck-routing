@@ -146,6 +146,9 @@ Weather comes from Open-Meteo, which needs no key.
   minute and roughly 38 new default trips a day. A trip planned beyond that comes back without
   its heatmap, or says the weather service is busy. Repeated trips are served from a one hour
   cache.
+- Checkpoints every 10 miles fit trips up to roughly 1,500 miles; a longer trip at that spacing
+  is asked to use 25 or 50 miles, because its checkpoints would need more forecast points than
+  the free weather service allows in a minute.
 - Heatmap cells grow with the trip, from 20 km on short trips to about 135 km across the
   country, so local weather on a long trip is averaged over a large square. The checkpoints,
   which decide the recommendation, are not affected.

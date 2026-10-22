@@ -327,3 +327,22 @@ of 95 km from Los Angeles to Houston); trips of a few hundred miles keep their 2
 the checkpoints, which decide the recommendation, are not affected. Repeating a trip within the
 hour costs nothing, since plans and corridor forecasts are cached. A paid Open-Meteo plan would
 remove the limit.
+
+The same limit caps the checkpoints: the three routes together may use at most 450 forecast
+points, so with the heatmap a plan stays under 600. At 25 or 50 mile spacing every trip up to
+3,500 miles fits; at 10 miles the limit is reached at roughly 1,500 miles. Such a plan is refused
+after routing and before any weather is fetched, with a message on the checkpoint field that
+names the spacing that fits ("Choose 25 mi or more"), rather than failing later as "busy".
+
+### 50. Typed places use the first suggestion
+
+A place typed without picking a suggestion is resolved to the place the suggestions list would
+have offered first; TomTom's address lookup is used only when there is no suggestion. The address
+lookup alone does not know places by name: "California Academy of Sciences" became a street of
+that name in Wisconsin. The resolved name is shown in the trip summary, so a surprise is visible.
+
+### 51. Close average risks are shown to three decimals
+
+Routes rank by average risk to three decimals. When the recommendation's reason compares two
+averages that are equal to two decimals (0.09 against 0.09), it shows the third (0.090 against
+0.094), so the sentence never reads as if the numbers were the same.
