@@ -24,6 +24,8 @@ const MAX_PEEK_SHARE = 0.45;
 const FULL_GAP = 8;
 /** Movement before a press on the sheet's top becomes a drag rather than a tap. */
 const DRAG_THRESHOLD = 6;
+/** How long the sheet glides to a new position (a little longer than the CSS transition). */
+export const MOVE_MS = 300;
 
 interface BottomSheetProps {
   label: string;
@@ -85,6 +87,24 @@ export function BottomSheet({
   // Height changes animate only after the first measurement, so the sheet does not grow from
   // nothing when the page opens.
   const [animated, setAnimated] = useState(false);
+  // The sheet glides only while it moves to another position (a tap, a key, the end of a drag).
+  // When the screen changes size under it, as a phone's keyboard opens or closes, it follows at
+  // once: a gliding sheet under a field the browser is scrolling into view makes the page shake.
+  const [moving, setMoving] = useState(false);
+  const [lastShown, setLastShown] = useState(shown);
+  if (lastShown !== shown) {
+    setLastShown(shown);
+    setMoving(true);
+  }
+  useEffect(() => {
+    if (!moving) return;
+    const timer = setTimeout(() => {
+      setMoving(false);
+    }, MOVE_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [moving, lastShown]);
 
   const measure = useCallback(() => {
     const container = sheetRef.current?.parentElement;
@@ -221,6 +241,7 @@ export function BottomSheet({
         Math.abs(current[candidate] - height) < Math.abs(current[best] - height) ? candidate : best,
       );
       setDragHeight(null);
+      setMoving(true);
       settle(nearest);
     };
     const stop = () => {
@@ -258,7 +279,7 @@ export function BottomSheet({
       style={{ height: dragHeight ?? settled }}
       data-snap={shown}
       data-dragging={dragHeight !== null || undefined}
-      data-animated={animated || undefined}
+      data-animated={(animated && moving) || undefined}
       data-peek-overflows={peekOverflows || undefined}
       aria-label={label}
       onFocus={() => {

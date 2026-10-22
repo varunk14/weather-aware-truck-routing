@@ -1,9 +1,9 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { BottomSheet, type SheetSnap } from "./BottomSheet";
+import { BottomSheet, MOVE_MS, type SheetSnap } from "./BottomSheet";
 
 const CONTAINER_HEIGHT = 800;
 const PEEK_CONTENT_HEIGHT = 150;
@@ -212,6 +212,29 @@ describe("BottomSheet", () => {
 
     expect(sheet()).toHaveAttribute("data-snap", "peek");
     expect(sheet()).toHaveStyle({ height: "194px" });
+  });
+
+  it("glides only to a new position, not when the screen changes size under it", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<Harness />);
+    // Measured, and ready to animate, but not moving.
+    await new Promise((done) => requestAnimationFrame(done));
+    expect(sheet()).not.toHaveAttribute("data-animated");
+
+    await user.click(screen.getByRole("button", { name: /trip panel/ }));
+    expect(sheet()).toHaveAttribute("data-animated");
+    await waitFor(
+      () => {
+        expect(sheet()).not.toHaveAttribute("data-animated");
+      },
+      { timeout: MOVE_MS * 3 },
+    );
+
+    // A phone's keyboard opens: the sheet takes its new height at once.
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(500);
+    rerender(<Harness />);
+    expect(sheet()).toHaveStyle({ height: "275px" });
+    expect(sheet()).not.toHaveAttribute("data-animated");
   });
 
   it("reports its settled height", () => {
