@@ -7,6 +7,8 @@ type NumberSegment = Exclude<Segment, "half">;
 const ORDER: readonly Segment[] = ["hour", "minute", "half"];
 const NAMES: Record<Segment, string> = { hour: "Hour", minute: "Minutes", half: "AM or PM" };
 const LIMITS: Record<NumberSegment, number> = { hour: 12, minute: 59 };
+// Phones and tablets: the on-screen keyboard closes whenever focus leaves a text field.
+const TOUCH_QUERY = "(pointer: coarse)";
 
 const pad = (value: number) => String(value).padStart(2, "0");
 // A part being typed shows two digits, as the browser's own time input does ("5" as "05"),
@@ -30,6 +32,11 @@ interface TimeInputProps {
  * next part takes over once one is complete), use the up and down arrows or the buttons above
  * and below, and the left and right arrows to move. Typing is read from what the field receives
  * rather than from key presses, which phone keyboards often do not report.
+ *
+ * A field holds only the digits being typed and shows its value as a placeholder, so nothing is
+ * ever selected: a phone shows no cut and paste bar, and the first digit typed starts afresh.
+ * On a touch screen focus stays in the minutes once they are complete and the step buttons
+ * leave focus where it is, so the keyboard does not close and open again under the finger.
  */
 export function TimeInput({
   hour,
@@ -46,6 +53,8 @@ export function TimeInput({
   };
   // Digits typed into a part that is not complete yet, shown as typed: "1" may become 12.
   const [draft, setDraft] = useState<{ segment: NumberSegment; digits: string } | null>(null);
+  // Whether the step button being pressed was touched rather than clicked.
+  const touchStep = useRef(false);
 
   const pm = hour >= 12;
   const hour12 = hour % 12 === 0 ? 12 : hour % 12;
@@ -79,20 +88,19 @@ export function TimeInput({
     }
     // Complete once two digits are in, or when no second digit could follow the first.
     const complete = digits.length === 2 || value * 10 > limit;
-    if (complete) focus(ORDER[ORDER.indexOf(segment) + 1]);
-    else setDraft({ segment, digits });
+    if (!complete) setDraft({ segment, digits });
+    // AM or PM is not a text field: moving there would close a phone's keyboard.
+    else if (segment === "minute" && window.matchMedia(TOUCH_QUERY).matches) setDraft(null);
+    else focus(ORDER[ORDER.indexOf(segment) + 1]);
   }
 
-  function onInput(segment: NumberSegment, event: ChangeEvent<HTMLInputElement>, shown: string) {
-    const raw = event.target.value.replace(/\D/g, "");
-    if (!raw) {
-      setDraft({ segment, digits: "" });
-      return;
-    }
-    const typing = draft?.segment === segment;
-    // Typed over the whole value (it is selected on focus), or added after it.
-    const typed = typing || !raw.startsWith(shown) ? raw : raw.slice(shown.length) || raw;
-    enter(segment, typed);
+  function onInput(segment: NumberSegment, event: ChangeEvent<HTMLInputElement>) {
+    // The field held nothing or the digits typed so far, so its text is all that was typed.
+    const typed = event.target.value.replace(/\D/g, "");
+    const shown = draft?.segment === segment ? shownDraft(draft.digits) : "";
+    // Shorter than before: a digit was deleted, which clears the part to be typed again.
+    if (typed && typed.length >= shown.length) enter(segment, typed);
+    else setDraft({ segment, digits: "" });
   }
 
   function onKeyDown(segment: Segment, event: KeyboardEvent<HTMLElement>) {
@@ -154,10 +162,12 @@ export function TimeInput({
                 aria-label={`Increase ${name}`}
                 onPointerDown={(event) => {
                   event.preventDefault();
+                  touchStep.current = event.pointerType === "touch";
                 }}
                 onClick={() => {
                   step(segment, 1);
-                  refs[segment].current?.focus();
+                  if (!touchStep.current) refs[segment].current?.focus();
+                  touchStep.current = false;
                 }}
               >
                 <svg viewBox="0 0 16 16" aria-hidden="true">
@@ -176,12 +186,10 @@ export function TimeInput({
                   pattern="[0-9]*"
                   autoComplete="off"
                   maxLength={3}
-                  value={draft?.segment === segment ? shownDraft(draft.digits) : part.text}
-                  onFocus={(event) => {
-                    event.currentTarget.select();
-                  }}
+                  value={draft?.segment === segment ? shownDraft(draft.digits) : ""}
+                  placeholder={part.text}
                   onChange={(event) => {
-                    onInput(segment, event, part.text);
+                    onInput(segment, event);
                   }}
                   onBlur={() => {
                     if (draft?.segment === segment) setDraft(null);
@@ -196,10 +204,12 @@ export function TimeInput({
                 aria-label={`Decrease ${name}`}
                 onPointerDown={(event) => {
                   event.preventDefault();
+                  touchStep.current = event.pointerType === "touch";
                 }}
                 onClick={() => {
                   step(segment, -1);
-                  refs[segment].current?.focus();
+                  if (!touchStep.current) refs[segment].current?.focus();
+                  touchStep.current = false;
                 }}
               >
                 <svg viewBox="0 0 16 16" aria-hidden="true">
