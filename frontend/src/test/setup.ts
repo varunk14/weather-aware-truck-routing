@@ -13,6 +13,11 @@ Object.defineProperty(window, "matchMedia", {
   value: (query: string) => mediaQueryList(query, () => false),
 });
 
+// jsdom does not lay out the page, so it has no scrollIntoView either.
+Element.prototype.scrollIntoView = function scrollIntoView() {
+  // Nothing to scroll in jsdom.
+};
+
 afterEach(() => {
   cleanup();
 });

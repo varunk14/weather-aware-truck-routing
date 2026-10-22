@@ -5,7 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { suggestPlaces } from "../../lib/api";
 import type { Suggestion } from "../../lib/types";
-import { PlaceInput } from "./PlaceInput";
+import { mediaQueryList } from "../../test/media";
+import { KEYBOARD_OPEN_MS, PlaceInput } from "./PlaceInput";
 import type { PlaceValue } from "./tripDraft";
 
 vi.mock("../../lib/api", async (importOriginal) => ({
@@ -147,5 +148,39 @@ describe("PlaceInput", () => {
 
     expect(input).toHaveAttribute("aria-invalid", "true");
     expect(input).toHaveAccessibleDescription("Enter where the trip ends.");
+  });
+
+  it("brings the field to the top on a phone once the keyboard is open", () => {
+    vi.useFakeTimers();
+    vi.spyOn(window, "matchMedia").mockImplementation((query) =>
+      mediaQueryList(query, () => query.includes("max-width")),
+    );
+    const scroll = vi.spyOn(Element.prototype, "scrollIntoView");
+    try {
+      render(<Harness />);
+      screen.getByRole("combobox", { name: "Destination" }).focus();
+
+      expect(scroll).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(KEYBOARD_OPEN_MS);
+      expect(scroll).toHaveBeenCalledWith({ block: "start", behavior: "smooth" });
+    } finally {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    }
+  });
+
+  it("leaves the page where it is on a wide screen", () => {
+    vi.useFakeTimers();
+    const scroll = vi.spyOn(Element.prototype, "scrollIntoView");
+    try {
+      render(<Harness />);
+      screen.getByRole("combobox", { name: "Destination" }).focus();
+      vi.advanceTimersByTime(KEYBOARD_OPEN_MS);
+
+      expect(scroll).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    }
   });
 });

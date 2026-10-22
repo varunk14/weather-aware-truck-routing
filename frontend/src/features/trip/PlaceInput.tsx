@@ -1,11 +1,14 @@
 import { type KeyboardEvent, useEffect, useId, useState } from "react";
 
+import { PHONE_QUERY } from "../../hooks/useMediaQuery";
 import { isAbortError, suggestPlaces } from "../../lib/api";
 import type { Suggestion } from "../../lib/types";
 import styles from "./fields.module.css";
 import type { PlaceValue } from "./tripDraft";
 
 export const SUGGEST_DELAY_MS = 250;
+// About how long a phone's on-screen keyboard takes to open.
+export const KEYBOARD_OPEN_MS = 300;
 const MIN_CHARS = 2;
 
 /**
@@ -129,6 +132,16 @@ export function PlaceInput({ label, value, onChange, error, placeholder }: Place
           setActive(-1);
         }}
         onKeyDown={onKeyDown}
+        onFocus={(event) => {
+          // On a phone the keyboard covers the lower half of the screen: once it is open, bring
+          // the field to the top of the panel so the suggestions under it are in view.
+          const field = event.currentTarget.parentElement;
+          if (!field || !window.matchMedia(PHONE_QUERY).matches) return;
+          const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+          window.setTimeout(() => {
+            field.scrollIntoView({ block: "start", behavior: reduced ? "auto" : "smooth" });
+          }, KEYBOARD_OPEN_MS);
+        }}
         onBlur={() => {
           setOpen(false);
           setActive(-1);
