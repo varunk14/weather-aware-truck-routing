@@ -3,8 +3,8 @@ weather at each checkpoint for the truck's arrival time, scores every route and 
 The corridor heatmap's weather is fetched at the same time as the checkpoints'; if only that
 lookup fails, the plan is still returned, without a heatmap.
 
-Plans are cached for a few minutes, so reloading the same trip calls neither TomTom nor
-Open-Meteo again. Only the simplified geometry is kept, which keeps cached plans small.
+Plans are cached for an hour, so reloading the same trip calls neither TomTom nor Open-Meteo
+again. Only the simplified geometry is kept, which keeps cached plans small.
 """
 
 import hashlib

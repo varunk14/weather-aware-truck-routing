@@ -108,7 +108,7 @@ def plan_to_json(plan: RoutePlan) -> dict[str, Any]:
 
 
 def _heatmap_json(heatmap: Heatmap) -> dict[str, Any]:
-    """Hourly frames per cell as plain lists, which keeps 240 cells x 50 hours compact."""
+    """Hourly frames per cell as plain lists, which keeps 120 cells x 50 hours compact."""
     return {
         "start": heatmap.start.isoformat(),
         "frames": FRAME_COUNT,

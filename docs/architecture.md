@@ -96,7 +96,7 @@ a visitor arrives while it wakes.
 
 ## Quality checks
 
-`make check` runs what CI runs on every pull request: Ruff, mypy and pytest for the API;
-ESLint, Prettier, TypeScript, Vitest and a production build for the web app; and Playwright end
-to end tests on a desktop and a phone profile. Tests never call TomTom or Open-Meteo: recorded
-responses and fakes stand in for them.
+`make check` runs what CI runs on every pull request: Ruff, mypy and pytest for the API; ESLint,
+Prettier, TypeScript and Vitest for the web app; and Playwright end to end tests against a
+production build of the web app, on a desktop and a phone profile. Tests never call TomTom or
+Open-Meteo: recorded responses and fakes stand in for them.

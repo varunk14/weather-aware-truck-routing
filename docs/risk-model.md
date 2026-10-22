@@ -41,7 +41,8 @@ Heavy loads make strong wind more dangerous. The rules only ever raise a level.
 | 45 to 54 mph | > 30,000 lb | No Travel          |
 | 35 to 44 mph | > 40,000 lb | Severe             |
 
-Exactly 30,000 lb or 40,000 lb does not trigger a rule ("more than" in the specification).
+Exactly 30,000 lb or 40,000 lb does not trigger a rule ("more than" in the specification). The
+wind ranges are continuous: "45 to 54 mph" is 45 mph up to, but not including, 55 mph.
 
 ## 4. Checkpoint level
 

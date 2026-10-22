@@ -44,7 +44,7 @@ const CHECKPOINT_ZOOM = 7;
 const FRAME_MAX_ZOOM = 11;
 /** Framing always leaves the routes at least this much of the map, or a quarter if larger. */
 const MIN_FRAME_PX = 120;
-/** A change in the map's size waits this long, so a keyboard or panel sliding away is done. */
+/** A change in the map's size waits this long, so a resize or a panel being hidden is done. */
 const RESIZE_SETTLE_MS = 200;
 /**
  * Camera moves wait this long for the layout to settle: picking a route on a phone also lowers
@@ -94,8 +94,8 @@ function fitInto(size: number, start: number, end: number): [number, number] {
 
 /**
  * The padding, made to leave the routes some of the map: when the interface around it covers
- * nearly all of it (a raised sheet and the timeline on a short phone, or a keyboard still open),
- * MapLibre would not frame anything at all and the camera would stay where it was.
+ * nearly all of it (a raised sheet and the timeline on a short phone), MapLibre would not frame
+ * anything at all and the camera would stay where it was.
  */
 function roomyPadding(map: MapLibreMap, padding: MapPadding): MapPadding {
   const { clientWidth, clientHeight } = map.getContainer();
@@ -189,7 +189,8 @@ export default function MapView({
       framedBounds.current = null;
       pendingMove.current = null;
     });
-    // The map changes size when a phone's keyboard closes or the side panel is hidden.
+    // The map changes size when the side panel is hidden, the window is resized or the phone is
+    // turned.
     let resizeTimer: ReturnType<typeof setTimeout> | undefined;
     map.on("resize", () => {
       clearTimeout(resizeTimer);
