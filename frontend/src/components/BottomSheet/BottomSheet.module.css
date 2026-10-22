@@ -76,6 +76,13 @@
   overscroll-behavior: contain;
 }
 
+/* A phone's keyboard covers the lower half of the screen and the page does not shrink for it.
+   While a place field is typed in, room below the content lets the field scroll to the top of
+   the sheet, so its suggestions show under it, above the keyboard. */
+.content:has([role="combobox"]:focus) {
+  padding-bottom: 75vh;
+}
+
 .sheet[data-snap="peek"] .content,
 .sheet[data-snap="bar"] .content,
 .sheet[data-snap="bar"] .peek {

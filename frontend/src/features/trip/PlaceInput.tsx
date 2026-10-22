@@ -1,4 +1,4 @@
-import { type KeyboardEvent, useEffect, useId, useState } from "react";
+import { type KeyboardEvent, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
 import { PHONE_QUERY } from "../../hooks/useMediaQuery";
 import { isAbortError, suggestPlaces } from "../../lib/api";
@@ -7,9 +7,12 @@ import styles from "./fields.module.css";
 import type { PlaceValue } from "./tripDraft";
 
 export const SUGGEST_DELAY_MS = 250;
-// About how long a phone's on-screen keyboard takes to open.
-export const KEYBOARD_OPEN_MS = 300;
 const MIN_CHARS = 2;
+// The suggestions stop this far above a phone's keyboard, and are never shorter than one.
+const KEYBOARD_GAP = 8;
+const MIN_LIST_HEIGHT = 64;
+// The list's height elsewhere, as in fields.module.css.
+const LIST_MAX_HEIGHT = 264;
 
 /**
  * Suggestions for ``query``, fetched after a short pause in typing. A newer query cancels the
@@ -65,6 +68,33 @@ export function PlaceInput({ label, value, onChange, error, placeholder }: Place
   const suggestions = useSuggestions(open && !value.picked ? value.text : "");
   const expanded = open && suggestions.length > 0;
   const optionId = (index: number) => `${id}-option-${String(index)}`;
+
+  // On a phone the keyboard covers the lower part of the screen without the page shrinking:
+  // the list then ends just above it and scrolls, so every suggestion can be reached.
+  const listRef = useRef<HTMLUListElement>(null);
+  const [listHeight, setListHeight] = useState<number | null>(null);
+  // Measured before the list is painted, so it never shows at a height that does not fit.
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    const screen = window.visualViewport;
+    if (!expanded || !list || !screen || !window.matchMedia(PHONE_QUERY).matches) return;
+    const fit = () => {
+      const bottom = screen.offsetTop + screen.height - KEYBOARD_GAP;
+      setListHeight(
+        Math.max(Math.round(bottom - list.getBoundingClientRect().top), MIN_LIST_HEIGHT),
+      );
+    };
+    fit();
+    screen.addEventListener("resize", fit);
+    screen.addEventListener("scroll", fit);
+    // The field scrolls up with the panel once the keyboard is open.
+    document.addEventListener("scroll", fit, true);
+    return () => {
+      screen.removeEventListener("resize", fit);
+      screen.removeEventListener("scroll", fit);
+      document.removeEventListener("scroll", fit, true);
+    };
+  }, [expanded]);
 
   function pick(suggestion: Suggestion) {
     onChange({ text: suggestion.title, picked: { id: suggestion.id, type: suggestion.type } });
@@ -133,14 +163,13 @@ export function PlaceInput({ label, value, onChange, error, placeholder }: Place
         }}
         onKeyDown={onKeyDown}
         onFocus={(event) => {
-          // On a phone the keyboard covers the lower half of the screen: once it is open, bring
-          // the field to the top of the panel so the suggestions under it are in view.
+          // On a phone the keyboard is about to cover the lower half of the screen: bring the
+          // field to the top of the panel at once, before it opens, so the suggestions under it
+          // stay in view and the browser has no reason to move the page as well.
           const field = event.currentTarget.parentElement;
-          if (!field || !window.matchMedia(PHONE_QUERY).matches) return;
-          const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-          window.setTimeout(() => {
-            field.scrollIntoView({ block: "start", behavior: reduced ? "auto" : "smooth" });
-          }, KEYBOARD_OPEN_MS);
+          if (field && window.matchMedia(PHONE_QUERY).matches) {
+            field.scrollIntoView({ block: "start", behavior: "auto" });
+          }
         }}
         onBlur={() => {
           setOpen(false);
@@ -148,10 +177,16 @@ export function PlaceInput({ label, value, onChange, error, placeholder }: Place
         }}
       />
       <ul
+        ref={listRef}
         id={listId}
         role="listbox"
         aria-label={`${label} suggestions`}
         className={styles.list}
+        style={
+          expanded && listHeight !== null
+            ? { maxHeight: Math.min(listHeight, LIST_MAX_HEIGHT) }
+            : undefined
+        }
         hidden={!expanded}
       >
         {suggestions.map((suggestion, index) => (
