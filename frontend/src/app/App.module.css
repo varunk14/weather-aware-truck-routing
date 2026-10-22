@@ -95,6 +95,9 @@
 
 .stack {
   display: grid;
+  /* A column may shrink below its widest line, so a long place name is cut short with an
+     ellipsis instead of pushing Edit and the recommendation off the screen. */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
 }
 

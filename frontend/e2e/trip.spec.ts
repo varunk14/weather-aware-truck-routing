@@ -219,6 +219,42 @@ test.describe("on a phone", () => {
     for (const size of sizes) expect(size).toBeGreaterThanOrEqual(44);
   });
 
+  test("keeps Edit and the recommendation on screen with very long place names", async ({
+    page,
+  }) => {
+    const plan = PLAN as { origin: { title: string }; destination: { title: string } };
+    const longNames = {
+      ...plan,
+      origin: { ...plan.origin, title: "California Academy of Sciences, Golden Gate Park" },
+      destination: { ...plan.destination, title: "Salt Lake City International Airport, UT" },
+    };
+    await mockApi(page, (route) => route.fulfill({ json: longNames }));
+    await page.goto("/");
+    await fillTrip(page);
+    await page.getByRole("button", { name: "Plan routes" }).click();
+
+    const edit = page.getByRole("button", { name: "Edit" });
+    await expect(edit).toBeVisible();
+    const viewport = page.viewportSize()?.width ?? 0;
+    const box = await edit.boundingBox();
+    expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(viewport);
+    const sheet = page.getByRole("region", { name: "Trip" });
+    // Nothing in the sheet reaches past its edge, lowered and again raised with the route cards.
+    for (const raise of [false, true]) {
+      if (raise) await page.getByRole("button", { name: "Show more of the trip panel" }).click();
+      const edges = await sheet.evaluate((element) => ({
+        sheet: element.getBoundingClientRect().right,
+        widest: Math.max(
+          ...[...element.querySelectorAll("*")].map((e) => e.getBoundingClientRect().right),
+        ),
+      }));
+      expect(edges.widest).toBeLessThanOrEqual(edges.sheet + 1);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      viewport,
+    );
+  });
+
   test("gives the forecast timeline touch targets of at least 44 px", async ({ page }) => {
     await mockApi(page, (route) => route.fulfill({ json: PLAN }));
     await page.goto("/");
