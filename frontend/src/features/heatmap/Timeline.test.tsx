@@ -43,6 +43,18 @@ describe("Timeline", () => {
     expect(screen.getByText("Route B arrived at +24.5 h")).toBeInTheDocument();
   });
 
+  it("marks the arrival on the slider when it falls within the 48 hours", () => {
+    setup();
+    expect(document.querySelector('[style*="--at"]')).toHaveStyle({ "--at": String(24.5 / 48) });
+  });
+
+  it("leaves the mark off for a trip longer than the slider, and still says when it arrives", () => {
+    setup({ arrivalHour: 62 });
+
+    expect(document.querySelector('[style*="--at"]')).toBeNull();
+    expect(screen.getByText("Route B · truck at mile 312 · arrives at +62 h")).toBeInTheDocument();
+  });
+
   it("moves the hour with the slider and stops playing", () => {
     const props = setup({ playing: true });
 
