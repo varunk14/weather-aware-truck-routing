@@ -35,8 +35,9 @@ interface TimeInputProps {
  *
  * A field holds only the digits being typed and shows its value as a placeholder, so nothing is
  * ever selected: a phone shows no cut and paste bar, and the first digit typed starts afresh.
- * On a touch screen focus stays in the minutes once they are complete and the step buttons
- * leave focus where it is, so the keyboard does not close and open again under the finger.
+ * On a touch screen focus stays in the minutes once they are complete, and the step buttons
+ * and AM or PM (a tap switches it) leave focus where it is, so the keyboard does not close and
+ * open again under the finger.
  */
 export function TimeInput({
   hour,
@@ -53,7 +54,7 @@ export function TimeInput({
   };
   // Digits typed into a part that is not complete yet, shown as typed: "1" may become 12.
   const [draft, setDraft] = useState<{ segment: NumberSegment; digits: string } | null>(null);
-  // Whether the step button being pressed was touched rather than clicked.
+  // Whether the step button or AM or PM being pressed was touched rather than clicked.
   const touchStep = useRef(false);
 
   const pm = hour >= 12;
@@ -175,7 +176,20 @@ export function TimeInput({
                 </svg>
               </button>
               {segment === "half" ? (
-                <span ref={refs.half} tabIndex={0} {...shared}>
+                <span
+                  ref={refs.half}
+                  tabIndex={0}
+                  {...shared}
+                  onPointerDown={(event) => {
+                    touchStep.current = event.pointerType === "touch";
+                    // A touch switches AM and PM without taking focus from the hour or minutes.
+                    if (touchStep.current) event.preventDefault();
+                  }}
+                  onClick={() => {
+                    if (touchStep.current) step("half", 1);
+                    touchStep.current = false;
+                  }}
+                >
                   {part.text}
                 </span>
               ) : (

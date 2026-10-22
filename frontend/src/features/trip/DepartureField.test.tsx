@@ -235,6 +235,11 @@ describe("DepartureField", () => {
       });
       expect(shownTime()).toBe("08 45 PM");
       expect(minutes).toHaveFocus();
+
+      // A touch on AM or PM switches it, and focus (with the keyboard) stays in the minutes.
+      await user.pointer({ keys: "[TouchA]", target: spin("AM or PM") });
+      expect(shownTime()).toBe("08 45 AM");
+      expect(minutes).toHaveFocus();
     } finally {
       touch.mockRestore();
     }
