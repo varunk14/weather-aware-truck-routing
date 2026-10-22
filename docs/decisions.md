@@ -259,8 +259,11 @@ has four positions: a bar with only the trip summary and Edit, a peek that adds 
 recommendation, half height with the route cards, and full height with everything, including
 the trip form. Its handle is a button (tap to cycle, arrow keys to step) and it can also be
 dragged. A new plan opens at the bar, and picking a route or a checkpoint lowers the sheet to it,
-so the routes have most of the screen; the recommendation is one tap away. Wider screens keep
-the side panel, which a tab on the map's edge hides so the map has the whole width.
+so the routes have most of the screen; the recommendation is one tap away. A phone's keyboard
+covers the page rather than shrinking it, so nothing moves under the finger while typing: a
+place field moves to the top of the sheet as it is tapped, and its suggestions end above the
+keyboard and scroll. Wider screens keep the side panel, which a tab on the map's edge hides so
+the map has the whole width.
 
 ### 42. Everything on the map is also in the panel
 
