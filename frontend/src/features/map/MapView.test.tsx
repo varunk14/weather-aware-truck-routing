@@ -32,6 +32,8 @@ const mapInstance = vi.hoisted(() => {
     easeTo: vi.fn(),
     fitBounds: vi.fn(),
     getCanvas: vi.fn(() => ({ style: {} })),
+    // jsdom lays nothing out; tests that need a size set one.
+    getContainer: vi.fn(() => ({ clientWidth: 0, clientHeight: 0 })),
     getSource: vi.fn((id: string) => sources.get(id)),
     getStyle: vi.fn(() => ({ layers: [{ id: "place-labels", type: "symbol" }] })),
     getZoom: vi.fn(() => 4),
@@ -134,6 +136,13 @@ function click(features: Record<string, unknown[]>) {
   }
 }
 
+/** Sends a map event (without a layer) to the handlers MapView registered. */
+function emit(event: string, payload: unknown = {}) {
+  for (const listener of mapInstance.listeners) {
+    if (listener.event === event && !listener.layer) listener.handler(payload);
+  }
+}
+
 function lastData(source: string): unknown {
   return mapInstance.sources.get(source)?.setData.mock.lastCall?.[0];
 }
@@ -147,6 +156,7 @@ beforeEach(() => {
   mapInstance.renderedFeatures.clear();
   mapInstance.tooltips.length = 0;
   mapInstance.markers.length = 0;
+  mapInstance.getContainer.mockReturnValue({ clientWidth: 0, clientHeight: 0 });
   stubWebGL(true);
 });
 
@@ -265,23 +275,120 @@ describe("MapView", () => {
     );
   });
 
-  it("does not move the camera when only the padding changes", () => {
+  it("frames the routes again when the space around them changes, until the user moves the map", () => {
+    const plan = tripPlan();
+    const lowered = { top: 32, right: 32, bottom: 120, left: 32 };
+    const raised = { top: 32, right: 32, bottom: 300, left: 32 };
+    const { rerender } = render(<MapView plan={plan} selectedRouteId="B" />);
+    loadMap();
+    settle();
+    mapInstance.fitBounds.mockClear();
+
+    rerender(<MapView plan={plan} selectedRouteId="B" padding={lowered} />);
+    settle();
+    expect(mapInstance.fitBounds).toHaveBeenCalledTimes(1);
+    expect(mapInstance.fitBounds).toHaveBeenCalledWith(
+      planBounds(plan),
+      expect.objectContaining({ padding: lowered }),
+    );
+
+    // The same padding again (a new object) is no change.
+    mapInstance.fitBounds.mockClear();
+    rerender(<MapView plan={plan} selectedRouteId="B" padding={{ ...lowered }} />);
+    settle();
+    expect(mapInstance.fitBounds).not.toHaveBeenCalled();
+
+    // Once the user drags or zooms the map, it stays where they put it.
+    emit("movestart", { originalEvent: new Event("pointerdown") });
+    rerender(<MapView plan={plan} selectedRouteId="B" padding={raised} />);
+    settle();
+    expect(mapInstance.fitBounds).not.toHaveBeenCalled();
+  });
+
+  it("frames the routes again once the map has changed size, unless the user moved it", () => {
+    const plan = tripPlan();
+    render(<MapView plan={plan} selectedRouteId="B" />);
+    loadMap();
+    settle();
+    mapInstance.fitBounds.mockClear();
+
+    // The map's own moves (its resize, its camera) do not count as the user's.
+    emit("movestart", {});
+    emit("resize");
+    emit("resize");
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(mapInstance.fitBounds).toHaveBeenCalledTimes(1);
+    expect(mapInstance.fitBounds).toHaveBeenCalledWith(planBounds(plan), expect.anything());
+
+    mapInstance.fitBounds.mockClear();
+    emit("movestart", { originalEvent: new Event("wheel") });
+    emit("resize");
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(mapInstance.fitBounds).not.toHaveBeenCalled();
+  });
+
+  it("stops framing the routes again once a checkpoint has been shown", () => {
+    const plan = tripPlan();
+    const { rerender } = render(<MapView plan={plan} selectedRouteId="B" />);
+    loadMap();
+    settle();
+    rerender(<MapView plan={plan} selectedRouteId="B" selectedCheckpoint={1} />);
+    settle();
+    expect(mapInstance.easeTo).toHaveBeenCalledTimes(1);
+    mapInstance.fitBounds.mockClear();
+
+    // Closing the details and changing the layout leave the camera on the checkpoint.
+    rerender(
+      <MapView
+        plan={plan}
+        selectedRouteId="B"
+        padding={{ top: 32, right: 32, bottom: 200, left: 32 }}
+      />,
+    );
+    settle();
+    emit("resize");
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(mapInstance.fitBounds).not.toHaveBeenCalled();
+  });
+
+  it("drops a move still waiting for the layout when the user moves the map first", () => {
     const plan = tripPlan();
     const { rerender } = render(<MapView plan={plan} selectedRouteId="B" />);
     loadMap();
     settle();
     mapInstance.fitBounds.mockClear();
 
-    rerender(
-      <MapView
-        plan={plan}
-        selectedRouteId="B"
-        padding={{ top: 0, right: 0, bottom: 300, left: 0 }}
-      />,
-    );
+    rerender(<MapView plan={plan} selectedRouteId="C" />);
+    emit("movestart", { originalEvent: new Event("pointerdown") });
     settle();
 
     expect(mapInstance.fitBounds).not.toHaveBeenCalled();
+  });
+
+  it("always leaves the routes some of the map, however much the interface covers", () => {
+    mapInstance.getContainer.mockReturnValue({ clientWidth: 400, clientHeight: 600 });
+    const plan = tripPlan();
+    render(
+      <MapView
+        plan={plan}
+        selectedRouteId="B"
+        padding={{ top: 32, right: 32, bottom: 600, left: 32 }}
+      />,
+    );
+    loadMap();
+    settle();
+
+    // 600 px tall: a quarter (150 px) stays for the routes; top and bottom shrink evenly.
+    expect(mapInstance.fitBounds).toHaveBeenCalledWith(
+      planBounds(plan),
+      expect.objectContaining({ padding: { top: 22, right: 32, bottom: 427, left: 32 } }),
+    );
   });
 
   it("frames a new plan even when it has the same route ids", () => {
