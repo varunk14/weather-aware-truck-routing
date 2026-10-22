@@ -442,6 +442,43 @@ class TestTripLength:
         assert open_meteo.requests == []
 
 
+class TestForecastPoints:
+    def test_too_many_checkpoints_are_refused_before_any_weather_call(
+        self,
+        client: Client,
+        api_tomtom: FakeTomTom,
+        open_meteo: FakeOpenMeteo,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        # The recorded routes need about 30 points at 10 mi and about 12 at 25 mi.
+        monkeypatch.setattr(planner, "MAX_WEATHER_LOCATIONS", 20)
+
+        response = post(client, trip(interval_mi=10))
+
+        assert response.status_code == 400
+        message = response.json()["interval_mi"][0]
+        assert message.startswith("Checkpoints every 10 mi need ")
+        assert message.endswith("allows 20 per plan. Choose 25 mi or more.")
+        assert open_meteo.requests == []
+
+    def test_the_wider_spacing_it_suggests_is_accepted(
+        self,
+        client: Client,
+        api_tomtom: FakeTomTom,
+        open_meteo: FakeOpenMeteo,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(planner, "MAX_WEATHER_LOCATIONS", 20)
+
+        assert post(client, trip(interval_mi=25)).status_code == 200
+
+    def test_the_longest_trip_fits_at_the_default_spacing(self) -> None:
+        # 3,500 mi at 25 mi spacing on three routes, with no point shared.
+        points = 3 * (planner.MAX_TRIP_MI // 25 + 1)
+
+        assert points <= planner.MAX_WEATHER_LOCATIONS
+
+
 class TestErrors:
     def test_no_truck_route(self, client: Client, api_tomtom: FakeTomTom) -> None:
         api_tomtom.respond("route", 400, load("route_no_route"))

@@ -140,6 +140,26 @@ test("shows the API's field messages on the form", async ({ page }) => {
   );
 });
 
+test("asks for wider checkpoints when a long trip needs too many forecast points", async ({
+  page,
+}) => {
+  const message =
+    "Checkpoints every 10 mi need 1,050 forecast points on this trip; the free weather service " +
+    "allows 450 per plan. Choose 25 mi or more.";
+  await mockApi(page, (route) => route.fulfill({ status: 400, json: { interval_mi: [message] } }));
+  await page.goto("/");
+  await fillTrip(page);
+  // The radio button sits under its label, which is what a person clicks.
+  await page
+    .locator("label")
+    .filter({ has: page.getByRole("radio", { name: "10 mi" }) })
+    .click();
+  await expect(page.getByRole("radio", { name: "10 mi" })).toBeChecked();
+  await page.getByRole("button", { name: "Plan routes" }).click();
+
+  await expect(page.getByText(message)).toBeVisible();
+});
+
 test("can cancel a slow plan", async ({ page }) => {
   await mockApi(page, () => new Promise<void>(() => undefined));
   await page.goto("/");

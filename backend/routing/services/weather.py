@@ -67,7 +67,7 @@ def weather_at_stops(client: OpenMeteoClient, stops: Sequence[Stop]) -> list[Wea
     etas: dict[LatLon, list[datetime]] = {}
     keys = []
     for stop in stops:
-        key = _location_key(stop.position)
+        key = location_key(stop.position)
         keys.append(key)
         etas.setdefault(key, []).append(stop.eta)
 
@@ -115,7 +115,8 @@ def nearest_hour(moment: datetime) -> datetime:
     return floor_hour(moment + HOUR / 2)
 
 
-def _location_key(position: LatLon) -> LatLon:
+def location_key(position: LatLon) -> LatLon:
+    """The forecast location a point shares with its neighbours (about 1 km around it)."""
     return LatLon(round(position.lat, LOCATION_DECIMALS), round(position.lon, LOCATION_DECIMALS))
 
 
