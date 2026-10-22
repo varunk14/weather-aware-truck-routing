@@ -41,6 +41,11 @@ type CameraMove = { bounds: LngLatBoundsLike } | { center: [number, number] };
 const DEFAULT_PADDING: MapPadding = { top: 48, right: 48, bottom: 48, left: 48 };
 const CAMERA_MS = 600;
 const CHECKPOINT_ZOOM = 7;
+const FRAME_MAX_ZOOM = 11;
+/** Framing always leaves the routes at least this much of the map, or a quarter if larger. */
+const MIN_FRAME_PX = 120;
+/** A change in the map's size waits this long, so a resize or a panel being hidden is done. */
+const RESIZE_SETTLE_MS = 200;
 /**
  * Camera moves wait this long for the layout to settle: picking a route on a phone also lowers
  * the bottom sheet, and the map must frame the route with the sheet's new height, not the old.
@@ -60,8 +65,8 @@ interface MapViewProps {
   heatLayer?: HeatLayer | null;
   /** Hours after departure shown by the heatmap (the slider). */
   hour?: number;
-  /** Where the truck is at that hour, or null to hide it. */
-  truck?: [number, number] | null;
+  /** Where the truck is at that hour and which way it points, or null to hide it. */
+  truck?: { lngLat: [number, number]; facing: "left" | "right" } | null;
 }
 
 /** A navy tile with a white truck, unlike the round start and end markers. */
@@ -78,6 +83,33 @@ function truckElement(): HTMLElement {
 function cameraDuration(): number {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : CAMERA_MS;
 }
+
+/** Room left at the two ends of one direction, shrunk evenly when it leaves the routes too little. */
+function fitInto(size: number, start: number, end: number): [number, number] {
+  const allowed = size - Math.max(MIN_FRAME_PX, size / 4);
+  if (size <= 0 || start + end <= allowed) return [start, end];
+  const share = Math.max(allowed, 0) / (start + end);
+  return [Math.floor(start * share), Math.floor(end * share)];
+}
+
+/**
+ * The padding, made to leave the routes some of the map: when the interface around it covers
+ * nearly all of it (a raised sheet and the timeline on a short phone), MapLibre would not frame
+ * anything at all and the camera would stay where it was.
+ */
+function roomyPadding(map: MapLibreMap, padding: MapPadding): MapPadding {
+  const { clientWidth, clientHeight } = map.getContainer();
+  const [top, bottom] = fitInto(clientHeight, padding.top ?? 0, padding.bottom ?? 0);
+  const [left, right] = fitInto(clientWidth, padding.left ?? 0, padding.right ?? 0);
+  return { top, right, bottom, left };
+}
+
+const samePadding = (a: MapPadding | null, b: MapPadding) =>
+  a !== null &&
+  a.top === b.top &&
+  a.right === b.right &&
+  a.bottom === b.bottom &&
+  a.left === b.left;
 
 function setSourceData(map: MapLibreMap, id: string, data: unknown): void {
   // The returned promise only reports when the worker has the data; nothing waits for it.
@@ -119,10 +151,17 @@ export default function MapView({
   const route = plan ? routeById(plan, selectedRouteId) : undefined;
 
   // The map's event handlers are bound once; they read the latest props through this ref.
-  const latest = useRef({ plan, route, onSelectRoute, onSelectCheckpoint });
+  const latest = useRef({ plan, route, padding, onSelectRoute, onSelectCheckpoint });
   useEffect(() => {
-    latest.current = { plan, route, onSelectRoute, onSelectCheckpoint };
+    latest.current = { plan, route, padding, onSelectRoute, onSelectCheckpoint };
   });
+
+  // What the camera last framed and with which padding, kept until the user moves the map: while
+  // it is kept, the routes are framed again whenever the space around them changes.
+  const framedBounds = useRef<LngLatBoundsLike | null>(null);
+  const framedPadding = useRef<MapPadding | null>(null);
+  // A camera move waiting for the layout to settle.
+  const pendingMove = useRef<CameraMove | null>(null);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -141,6 +180,31 @@ export default function MapView({
     map.once("load", () => {
       addPlanLayers(map);
       setLoaded(true);
+    });
+
+    // Moves the user makes come with the input event; the map's own moves do not. A user move
+    // also cancels a move still waiting for the layout, so the camera never jumps under them.
+    map.on("movestart", (event) => {
+      if (!event.originalEvent) return;
+      framedBounds.current = null;
+      pendingMove.current = null;
+    });
+    // The map changes size when the side panel is hidden, the window is resized or the phone is
+    // turned.
+    let resizeTimer: ReturnType<typeof setTimeout> | undefined;
+    map.on("resize", () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        const bounds = framedBounds.current;
+        if (!bounds) return;
+        const { padding: current } = latest.current;
+        framedPadding.current = current;
+        map.fitBounds(bounds, {
+          padding: roomyPadding(map, current),
+          duration: cameraDuration(),
+          maxZoom: FRAME_MAX_ZOOM,
+        });
+      }, RESIZE_SETTLE_MS);
     });
 
     map.on("click", (event) => {
@@ -189,6 +253,7 @@ export default function MapView({
     });
 
     return () => {
+      clearTimeout(resizeTimer);
       mapRef.current = null;
       map.remove();
     };
@@ -241,18 +306,22 @@ export default function MapView({
       truckMarker.current = null;
       return;
     }
-    truckMarker.current ??= new Marker({ element: truckElement() }).setLngLat(truck).addTo(map);
-    truckMarker.current.setLngLat(truck);
+    truckMarker.current ??= new Marker({ element: truckElement() })
+      .setLngLat(truck.lngLat)
+      .addTo(map);
+    truckMarker.current.setLngLat(truck.lngLat);
+    truckMarker.current.getElement().dataset.facing = truck.facing;
   }, [loaded, truck]);
 
   // Move the camera: to all routes when a plan arrives, to a route when the user picks another,
-  // to a checkpoint when one is picked. The move is applied once the padding has settled.
+  // to a checkpoint when one is picked, and to the framed routes again when the space around
+  // them changes and the user has not moved the map. The move is applied once the padding has
+  // settled.
   const framed = useRef<{
     plan: TripPlan | null;
     routeId: string | null;
     checkpoint: number | null;
   }>({ plan: null, routeId: null, checkpoint: null });
-  const pendingMove = useRef<CameraMove | null>(null);
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !loaded || !plan) return;
@@ -268,6 +337,12 @@ export default function MapView({
       if (bounds) pendingMove.current = { bounds };
     } else if (last.checkpoint !== selectedCheckpoint && checkpoint) {
       pendingMove.current = { center: [checkpoint.lon, checkpoint.lat] };
+    } else if (
+      !pendingMove.current &&
+      framedBounds.current &&
+      !samePadding(framedPadding.current, padding)
+    ) {
+      pendingMove.current = { bounds: framedBounds.current };
     }
     if (!pendingMove.current) return;
 
@@ -277,12 +352,19 @@ export default function MapView({
       if (!move) return;
       const duration = cameraDuration();
       if ("bounds" in move) {
-        map.fitBounds(move.bounds, { padding, duration, maxZoom: 11 });
+        framedBounds.current = move.bounds;
+        framedPadding.current = padding;
+        map.fitBounds(move.bounds, {
+          padding: roomyPadding(map, padding),
+          duration,
+          maxZoom: FRAME_MAX_ZOOM,
+        });
       } else {
+        framedBounds.current = null;
         map.easeTo({
           center: move.center,
           zoom: Math.max(map.getZoom(), CHECKPOINT_ZOOM),
-          padding,
+          padding: roomyPadding(map, padding),
           duration,
         });
       }

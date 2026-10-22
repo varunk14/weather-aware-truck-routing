@@ -138,6 +138,17 @@ class TestRecommend:
             "for 5 min more driving."
         )
 
+    def test_shows_a_third_decimal_when_the_averages_look_the_same(self) -> None:
+        # Average risk 0.090 against 0.094: both are 0.09 to two decimals.
+        recommendation = recommend(
+            [option("A", 600, low=906, moderate=94), option("B", 605, low=910, moderate=90)]
+        )
+
+        assert recommendation.reason == (
+            "Lower average weather risk than the fastest route (Route A): 0.090 vs 0.094, "
+            "for 5 min more driving."
+        )
+
     def test_warns_when_every_route_crosses_no_travel_conditions(self) -> None:
         recommendation = recommend(
             [option("A", 600, low=970, no_travel=30), option("B", 700, low=988, no_travel=12)]

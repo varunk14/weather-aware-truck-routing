@@ -3,8 +3,8 @@ weather at each checkpoint for the truck's arrival time, scores every route and 
 The corridor heatmap's weather is fetched at the same time as the checkpoints'; if only that
 lookup fails, the plan is still returned, without a heatmap.
 
-Plans are cached for a few minutes, so reloading the same trip calls neither TomTom nor
-Open-Meteo again. Only the simplified geometry is kept, which keeps cached plans small.
+Plans are cached for an hour, so reloading the same trip calls neither TomTom nor Open-Meteo
+again. Only the simplified geometry is kept, which keeps cached plans small.
 """
 
 import hashlib
@@ -33,7 +33,7 @@ from routing.services.checkpoints import Checkpoint, place_checkpoints
 from routing.services.heatmap import Heatmap, corridor_heatmap
 from routing.services.places import Location, resolve
 from routing.services.route_options import RouteOption, find_route_options
-from routing.services.weather import Stop, Weather, weather_at_stops
+from routing.services.weather import Stop, Weather, location_key, weather_at_stops
 
 logger = logging.getLogger(__name__)
 
@@ -47,11 +47,19 @@ MIN_TRIP_M = 1_000
 # The longest trip planned. US coast to coast is about 2,800 miles; longer trips would need
 # thousands of forecast locations and could run past the 16 day forecast.
 MAX_TRIP_MI = 3_500
+# Open-Meteo's free plan allows 600 forecast points a minute; with the heatmap's 120 cells, the
+# checkpoints of all three routes may use at most this many. Long trips at 10 mi spacing need
+# more (about 1,000 for 3,500 mi), so they are asked to use a wider spacing.
+MAX_WEATHER_LOCATIONS = 450
+# The checkpoint spacings the form offers, in miles.
+INTERVALS_MI = (10, 25, 50)
 ROUTE_IDS = ("A", "B", "C")
 
 
 class TripError(ValueError):
-    """The trip cannot be planned as asked; the message says why, for the destination field."""
+    """The trip cannot be planned as asked; the message says why, on the form field ``field``."""
+
+    field = "destination"
 
 
 class SamePlaceError(TripError):
@@ -65,6 +73,24 @@ class TripTooLongError(TripError):
         super().__init__(
             f"This trip is about {miles:,.0f} mi; Clearway plans trips of up to "
             f"{MAX_TRIP_MI:,} mi. Split it into shorter legs."
+        )
+
+
+class TooManyCheckpointsError(TripError):
+    """The checkpoints would need more forecast points than one plan may use."""
+
+    field = "interval_mi"
+
+    def __init__(self, points: int, interval_mi: int) -> None:
+        wider = [
+            miles
+            for miles in INTERVALS_MI
+            if miles > interval_mi and points * interval_mi / miles <= MAX_WEATHER_LOCATIONS
+        ]
+        choice = f"Choose {wider[0]} mi or more." if wider else "Choose a shorter trip."
+        super().__init__(
+            f"Checkpoints every {interval_mi} mi need {points:,} forecast points on this trip; "
+            f"the free weather service allows {MAX_WEATHER_LOCATIONS} per plan. {choice}"
         )
 
 
@@ -150,6 +176,10 @@ def _build_plan(
         raise TripTooLongError(shortest_mi)
     named = list(zip(ROUTE_IDS, options, strict=False))
     checkpoints = [place_checkpoints(option.route, trip.interval_mi) for _, option in named]
+    # Checked before any weather is fetched, so a refused plan costs no weather calls.
+    points = len({location_key(c.position) for route in checkpoints for c in route})
+    if points > MAX_WEATHER_LOCATIONS:
+        raise TooManyCheckpointsError(points, trip.interval_mi)
     # The simplified lines are drawn on the map and also outline the heatmap's corridor, whose
     # cells are 20 km or more, so the full-detail routes are walked only once each.
     geometries = [tuple(simplify(option.route.points, GEOMETRY_TOLERANCE_M)) for _, option in named]

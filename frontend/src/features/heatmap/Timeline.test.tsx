@@ -14,7 +14,12 @@ function setup(overrides: Partial<Parameters<typeof Timeline>[0]> = {}) {
     layer: "risk" as const,
     onLayerChange: vi.fn(),
     routeId: "B",
-    truck: { lngLat: [-121.5, 46.5] as [number, number], mile: 312.4, status: "driving" as const },
+    truck: {
+      lngLat: [-121.5, 46.5] as [number, number],
+      mile: 312.4,
+      status: "driving" as const,
+      facing: "right" as const,
+    },
     arrivalHour: 24.5,
     heatmap: true,
     ...overrides,
@@ -39,8 +44,20 @@ describe("Timeline", () => {
   });
 
   it("says when the truck has arrived", () => {
-    setup({ truck: { lngLat: [-121, 46], mile: 100, status: "arrived" } });
+    setup({ truck: { lngLat: [-121, 46], mile: 100, status: "arrived", facing: "right" } });
     expect(screen.getByText("Route B arrived at +24.5 h")).toBeInTheDocument();
+  });
+
+  it("marks the arrival on the slider when it falls within the 48 hours", () => {
+    setup();
+    expect(document.querySelector('[style*="--at"]')).toHaveStyle({ "--at": String(24.5 / 48) });
+  });
+
+  it("leaves the mark off for a trip longer than the slider, and still says when it arrives", () => {
+    setup({ arrivalHour: 62 });
+
+    expect(document.querySelector('[style*="--at"]')).toBeNull();
+    expect(screen.getByText("Route B · truck at mile 312 · arrives at +62 h")).toBeInTheDocument();
   });
 
   it("moves the hour with the slider and stops playing", () => {

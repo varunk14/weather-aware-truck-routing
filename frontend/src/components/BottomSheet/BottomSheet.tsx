@@ -12,9 +12,11 @@ import {
 
 import styles from "./BottomSheet.module.css";
 
-export type SheetSnap = "peek" | "half" | "full";
+export type SheetSnap = "bar" | "peek" | "half" | "full";
 
-const ORDER: readonly SheetSnap[] = ["peek", "half", "full"];
+const ORDER: readonly SheetSnap[] = ["bar", "peek", "half", "full"];
+// Without bar content the sheet has no bar position; "bar" then means its lowest, the peek.
+const WITHOUT_BAR: readonly SheetSnap[] = ["peek", "half", "full"];
 // The handle is a full-width button, 44 px tall so it is easy to hit.
 const HANDLE_HEIGHT = 44;
 const HALF_SHARE = 0.55;
@@ -22,6 +24,8 @@ const MAX_PEEK_SHARE = 0.45;
 const FULL_GAP = 8;
 /** Movement before a press on the sheet's top becomes a drag rather than a tap. */
 const DRAG_THRESHOLD = 6;
+/** How long the sheet glides to a new position (a little longer than the CSS transition). */
+export const MOVE_MS = 300;
 
 interface BottomSheetProps {
   label: string;
@@ -29,7 +33,12 @@ interface BottomSheetProps {
   onSnapChange: (snap: SheetSnap) => void;
   /** Height of the settled sheet, so the map can keep its content clear of it. */
   onHeightChange?: (height: number) => void;
-  /** Always visible at the top of the sheet; its height sets the peek position. */
+  /**
+   * Optional: always visible at the very top, above the peek content. With it the sheet has a
+   * lowest position, the bar, that shows only this and leaves the most of the map in view.
+   */
+  bar?: ReactNode;
+  /** Visible at the top of the sheet from the peek position up; with the bar it sets the peek. */
   peek: ReactNode;
   /** Shown below the peek content at the half and full positions. */
   children?: ReactNode;
@@ -42,44 +51,76 @@ interface Drag {
   height: number | null;
 }
 
-function step(snap: SheetSnap, by: number): SheetSnap {
-  const index = Math.min(Math.max(ORDER.indexOf(snap) + by, 0), ORDER.length - 1);
-  return ORDER[index] ?? snap;
+function step(order: readonly SheetSnap[], snap: SheetSnap, by: number): SheetSnap {
+  const index = Math.min(Math.max(order.indexOf(snap) + by, 0), order.length - 1);
+  return order[index] ?? snap;
 }
 
 /**
- * A panel over the bottom of the map with three positions: peek, half and full. The handle is a
- * button: tap or Enter cycles through the positions and the arrow keys step up and down. The
- * top of the sheet can also be dragged; it settles at the nearest position.
+ * A panel over the bottom of the map with three positions, peek, half and full, and with bar
+ * content a fourth, lowest one: the bar. The handle is a button: tap or Enter cycles through the
+ * positions and the arrow keys step up and down. The top of the sheet can also be dragged; it
+ * settles at the nearest position.
  */
 export function BottomSheet({
   label,
   snap,
   onSnapChange,
   onHeightChange,
+  bar,
   peek,
   children,
 }: BottomSheetProps) {
+  const hasBar = bar !== undefined;
+  const order = hasBar ? ORDER : WITHOUT_BAR;
+  const lowest = order[0] ?? "peek";
+  // A sheet without a bar asked to show it shows its lowest position instead.
+  const shown: SheetSnap = order.includes(snap) ? snap : lowest;
   const contentId = useId();
   const sheetRef = useRef<HTMLElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
   const peekRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const draggedRef = useRef(false);
-  const [space, setSpace] = useState({ available: 0, peek: 0 });
+  const [space, setSpace] = useState({ available: 0, bar: 0, peek: 0 });
   const [dragHeight, setDragHeight] = useState<number | null>(null);
   // Height changes animate only after the first measurement, so the sheet does not grow from
   // nothing when the page opens.
   const [animated, setAnimated] = useState(false);
+  // The sheet glides only while it moves to another position (a tap, a key, the end of a drag).
+  // When the screen changes size under it, as a phone's keyboard opens or closes, it follows at
+  // once: a gliding sheet under a field the browser is scrolling into view makes the page shake.
+  const [moving, setMoving] = useState(false);
+  const [lastShown, setLastShown] = useState(shown);
+  if (lastShown !== shown) {
+    setLastShown(shown);
+    setMoving(true);
+  }
+  useEffect(() => {
+    if (!moving) return;
+    const timer = setTimeout(() => {
+      setMoving(false);
+    }, MOVE_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [moving, lastShown]);
 
   const measure = useCallback(() => {
     const container = sheetRef.current?.parentElement;
     const peekContent = peekRef.current;
     if (!container || !peekContent) return;
     // scrollHeight: the content's full height, even while it is capped and scrolls.
-    const next = { available: container.clientHeight, peek: peekContent.scrollHeight };
+    const next = {
+      available: container.clientHeight,
+      bar: barRef.current?.scrollHeight ?? 0,
+      peek: peekContent.scrollHeight,
+    };
     // Same numbers keep the same state, so measuring after every render cannot loop.
     setSpace((current) =>
-      current.available === next.available && current.peek === next.peek ? current : next,
+      current.available === next.available && current.bar === next.bar && current.peek === next.peek
+        ? current
+        : next,
     );
   }, []);
 
@@ -93,11 +134,15 @@ export function BottomSheet({
   useLayoutEffect(() => {
     const active = document.activeElement;
     const lostInside = active === document.body && focusWasInside.current;
-    const hiddenInside = snap === "peek" && contentRef.current?.contains(active);
+    const lowered = shown === "bar" || shown === "peek";
+    const hiddenInside =
+      (lowered && contentRef.current?.contains(active) === true) ||
+      (shown === "bar" && peekRef.current?.contains(active) === true);
     if (lostInside || hiddenInside) handleRef.current?.focus({ preventScroll: true });
   });
 
-  // The screen and the content can also change size without a render (rotation, fonts).
+  // The screen and the content can also change size without a render (rotation, fonts). The bar
+  // comes and goes with what the sheet shows, so it is observed again whenever it appears.
   useLayoutEffect(() => {
     const container = sheetRef.current?.parentElement;
     const peekContent = peekRef.current;
@@ -105,21 +150,25 @@ export function BottomSheet({
     const observer = new ResizeObserver(measure);
     observer.observe(container);
     observer.observe(peekContent);
+    if (barRef.current) observer.observe(barRef.current);
     return () => {
       observer.disconnect();
     };
-  }, [measure]);
+  }, [measure, hasBar]);
 
   // Peek content taller than its share of the screen (short phones, large text) scrolls.
   const maxPeek = space.available * MAX_PEEK_SHARE;
-  const peekOverflows = space.available > 0 && HANDLE_HEIGHT + space.peek > maxPeek;
-  const peekHeight = Math.min(HANDLE_HEIGHT + space.peek, maxPeek);
+  const top = HANDLE_HEIGHT + space.bar;
+  const peekOverflows = space.available > 0 && top + space.peek > maxPeek;
+  const barHeight = Math.min(top, maxPeek);
+  const peekHeight = Math.min(top + space.peek, maxPeek);
   const heights: Record<SheetSnap, number> = {
+    bar: barHeight,
     peek: peekHeight,
     half: Math.max(space.available * HALF_SHARE, peekHeight),
     full: Math.max(space.available - FULL_GAP, peekHeight),
   };
-  const settled = Math.round(heights[snap]);
+  const settled = Math.round(heights[shown]);
 
   useEffect(() => {
     if (settled > 0) onHeightChange?.(settled);
@@ -137,14 +186,16 @@ export function BottomSheet({
   }, [measured, animated]);
 
   useEffect(() => {
-    if (snap === "peek" && contentRef.current) contentRef.current.scrollTop = 0;
-  }, [snap]);
+    if ((shown === "bar" || shown === "peek") && contentRef.current) {
+      contentRef.current.scrollTop = 0;
+    }
+  }, [shown]);
 
   // Window listeners follow a press until it ends, wherever the pointer goes; they read the
-  // latest sizes and callback through this ref.
-  const latest = useRef({ heights, onSnapChange });
+  // latest sizes, positions and callback through this ref.
+  const latest = useRef({ heights, order, onSnapChange });
   useEffect(() => {
-    latest.current = { heights, onSnapChange };
+    latest.current = { heights, order, onSnapChange };
   });
   const stopDragRef = useRef<(() => void) | null>(null);
   useEffect(
@@ -170,8 +221,9 @@ export function BottomSheet({
       const moved = drag.startY - moveEvent.clientY;
       // Small movements stay taps, so buttons in the sheet still get their clicks.
       if (drag.height === null && Math.abs(moved) < DRAG_THRESHOLD) return;
-      const { heights: current } = latest.current;
-      drag.height = Math.min(Math.max(drag.startHeight + moved, current.peek * 0.8), current.full);
+      const { heights: current, order: positions } = latest.current;
+      const floor = current[positions[0] ?? "peek"] * 0.8;
+      drag.height = Math.min(Math.max(drag.startHeight + moved, floor), current.full);
       draggedRef.current = true;
       setDragHeight(drag.height);
     };
@@ -184,11 +236,12 @@ export function BottomSheet({
       setTimeout(() => {
         draggedRef.current = false;
       }, 0);
-      const { heights: current, onSnapChange: settle } = latest.current;
-      const nearest = ORDER.reduce((best, candidate) =>
+      const { heights: current, order: positions, onSnapChange: settle } = latest.current;
+      const nearest = positions.reduce((best, candidate) =>
         Math.abs(current[candidate] - height) < Math.abs(current[best] - height) ? candidate : best,
       );
       setDragHeight(null);
+      setMoving(true);
       settle(nearest);
     };
     const stop = () => {
@@ -209,13 +262,13 @@ export function BottomSheet({
       draggedRef.current = false;
       return;
     }
-    onSnapChange(snap === "full" ? "peek" : step(snap, 1));
+    onSnapChange(shown === "full" ? lowest : step(order, shown, 1));
   }
 
   function onHandleKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
     if (event.key === "ArrowUp" || event.key === "ArrowDown") {
       event.preventDefault();
-      onSnapChange(step(snap, event.key === "ArrowUp" ? 1 : -1));
+      onSnapChange(step(order, shown, event.key === "ArrowUp" ? 1 : -1));
     }
   }
 
@@ -224,9 +277,9 @@ export function BottomSheet({
       ref={sheetRef}
       className={styles.sheet}
       style={{ height: dragHeight ?? settled }}
-      data-snap={snap}
+      data-snap={shown}
       data-dragging={dragHeight !== null || undefined}
-      data-animated={animated || undefined}
+      data-animated={(animated && moving) || undefined}
       data-peek-overflows={peekOverflows || undefined}
       aria-label={label}
       onFocus={() => {
@@ -245,24 +298,35 @@ export function BottomSheet({
           type="button"
           className={styles.handle}
           aria-label={
-            snap === "full" ? "Show less of the trip panel" : "Show more of the trip panel"
+            shown === "full" ? "Show less of the trip panel" : "Show more of the trip panel"
           }
-          aria-expanded={snap !== "peek"}
+          aria-expanded={shown === "half" || shown === "full"}
           aria-controls={contentId}
           onClick={onHandleClick}
           onKeyDown={onHandleKeyDown}
         >
           <span aria-hidden="true" />
         </button>
+        {hasBar && (
+          <div ref={barRef} className={styles.bar}>
+            {bar}
+          </div>
+        )}
         <div
           ref={peekRef}
           className={styles.peek}
-          style={peekOverflows ? { maxHeight: maxPeek - HANDLE_HEIGHT } : undefined}
+          style={peekOverflows ? { maxHeight: Math.max(maxPeek - top, 0) } : undefined}
+          inert={shown === "bar"}
         >
           {peek}
         </div>
       </div>
-      <div ref={contentRef} id={contentId} className={styles.content} inert={snap === "peek"}>
+      <div
+        ref={contentRef}
+        id={contentId}
+        className={styles.content}
+        inert={shown === "bar" || shown === "peek"}
+      >
         {children}
       </div>
     </section>

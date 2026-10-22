@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { suggestPlaces } from "../../lib/api";
 import type { Suggestion } from "../../lib/types";
+import { mediaQueryList } from "../../test/media";
 import { PlaceInput } from "./PlaceInput";
 import type { PlaceValue } from "./tripDraft";
 
@@ -147,5 +148,60 @@ describe("PlaceInput", () => {
 
     expect(input).toHaveAttribute("aria-invalid", "true");
     expect(input).toHaveAccessibleDescription("Enter where the trip ends.");
+  });
+
+  it("brings the field to the top on a phone at once, before the keyboard opens", () => {
+    vi.spyOn(window, "matchMedia").mockImplementation((query) =>
+      mediaQueryList(query, () => query.includes("max-width")),
+    );
+    const scroll = vi.spyOn(Element.prototype, "scrollIntoView");
+    try {
+      render(<Harness />);
+      screen.getByRole("combobox", { name: "Destination" }).focus();
+
+      expect(scroll).toHaveBeenCalledTimes(1);
+      expect(scroll).toHaveBeenCalledWith({ block: "start", behavior: "auto" });
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
+  it("leaves the page where it is on a wide screen", () => {
+    const scroll = vi.spyOn(Element.prototype, "scrollIntoView");
+    try {
+      render(<Harness />);
+      screen.getByRole("combobox", { name: "Destination" }).focus();
+
+      expect(scroll).not.toHaveBeenCalled();
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
+  it("on a phone, ends the suggestions above the keyboard so all of them can be reached", async () => {
+    vi.spyOn(window, "matchMedia").mockImplementation((query) =>
+      mediaQueryList(query, () => query.includes("max-width")),
+    );
+    // The keyboard leaves the top 400 px of the screen; the list starts 250 px down. jsdom has
+    // no visual viewport, so the test gives it one.
+    Object.defineProperty(window, "visualViewport", {
+      configurable: true,
+      value: { offsetTop: 0, height: 400, addEventListener: vi.fn(), removeEventListener: vi.fn() },
+    });
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+      top: 250,
+    } as DOMRect);
+    vi.mocked(suggestPlaces).mockResolvedValue([DENVER, DENTON]);
+    try {
+      const user = userEvent.setup();
+      render(<Harness />);
+      await user.type(screen.getByRole("combobox", { name: "Destination" }), "Den");
+
+      const list = await screen.findByRole("listbox", { name: "Destination suggestions" });
+      expect(list.style.maxHeight).toBe("142px");
+    } finally {
+      Reflect.deleteProperty(window, "visualViewport");
+      vi.restoreAllMocks();
+    }
   });
 });

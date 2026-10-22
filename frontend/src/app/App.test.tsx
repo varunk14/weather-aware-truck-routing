@@ -150,6 +150,35 @@ describe("App on a wide screen", () => {
     });
   });
 
+  it("hides the side panel so the map has the whole width, and shows it again", async () => {
+    vi.mocked(planTrip).mockResolvedValue(tripPlan());
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+    await planATrip(user);
+    await screen.findByRole("region", { name: "Route B · 15 h 10 min" });
+
+    const toggle = screen.getByRole("button", { name: "Trip panel" });
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(toggle).toHaveAttribute("title", "Hide the trip panel");
+    expect(toggle).toHaveAttribute(
+      "aria-controls",
+      screen.getByRole("region", { name: "Trip planner" }).id,
+    );
+    await user.click(toggle);
+    expect(container.querySelector("main")).toHaveAttribute("data-panel", "hidden");
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).toHaveAttribute("title", "Show the trip panel");
+    expect(toggle).toHaveFocus();
+    // The header, with the API's status, stays.
+    expect(screen.getByRole("status")).toHaveTextContent("API online");
+
+    // The plan, the selection and the timeline stay as they were.
+    expect(screen.getByRole("region", { name: "Forecast timeline" })).toBeInTheDocument();
+    await user.click(toggle);
+    expect(container.querySelector("main")).not.toHaveAttribute("data-panel");
+    expect(screen.getByRole("region", { name: "Route B · 15 h 10 min" })).toBeInTheDocument();
+  });
+
   it("explains a failed plan and can try again", async () => {
     vi.mocked(planTrip).mockRejectedValueOnce(
       new ApiError("The weather service is not responding. Try again in a moment.", 503),
@@ -180,7 +209,7 @@ describe("App on a phone", () => {
     expect(within(sheet).getByRole("form", { name: "Plan a trip" })).toBeInTheDocument();
   });
 
-  it("drops the sheet to the summary and recommendation once the plan is ready", async () => {
+  it("lowers the sheet to the trip's bar once the plan is ready, leaving the map in view", async () => {
     vi.mocked(planTrip).mockResolvedValue(tripPlan());
     usePhoneLayout();
     const user = userEvent.setup();
@@ -194,16 +223,24 @@ describe("App on a phone", () => {
         within(sheet).getByRole("region", { name: "Route B · 15 h 10 min" }),
       ).toBeInTheDocument();
     });
-    expect(sheet).toHaveAttribute("data-snap", "peek");
+    expect(sheet).toHaveAttribute("data-snap", "bar");
     expect(within(sheet).getByText(/Seattle, WA/)).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Forecast timeline" })).toBeInTheDocument();
+    // The recommendation is one tap on the handle away.
+    const recommendation = within(sheet).getByRole("region", { name: "Route B · 15 h 10 min" });
+    expect(recommendation.closest("[inert]")).not.toBeNull();
+    await user.click(within(sheet).getByRole("button", { name: "Show more of the trip panel" }));
+    expect(sheet).toHaveAttribute("data-snap", "peek");
+    expect(recommendation.closest("[inert]")).toBeNull();
+    expect(screen.getByRole("region", { name: "Forecast timeline" })).toBeInTheDocument();
 
     await user.click(within(sheet).getByRole("button", { name: "Edit" }));
     expect(sheet).toHaveAttribute("data-snap", "full");
     await user.click(within(sheet).getByRole("button", { name: "Back to routes" }));
-    expect(sheet).toHaveAttribute("data-snap", "peek");
+    expect(sheet).toHaveAttribute("data-snap", "bar");
   });
 
-  it("opens a new plan at the peek position again after the trip was edited", async () => {
+  it("opens a new plan lowered to the bar again after the trip was edited", async () => {
     vi.mocked(planTrip).mockResolvedValue(tripPlan());
     usePhoneLayout();
     const user = userEvent.setup();
@@ -212,16 +249,17 @@ describe("App on a phone", () => {
     const sheet = screen.getByRole("region", { name: "Trip" });
     await screen.findByRole("region", { name: "Route B · 15 h 10 min" });
 
+    await user.click(within(sheet).getByRole("button", { name: "Show more of the trip panel" }));
     await user.click(within(sheet).getByRole("button", { name: "Show more of the trip panel" }));
     expect(sheet).toHaveAttribute("data-snap", "half");
     await user.click(within(sheet).getByRole("button", { name: "Edit" }));
     await user.click(within(sheet).getByRole("button", { name: "Plan routes" }));
 
     await screen.findByRole("region", { name: "Route B · 15 h 10 min" });
-    expect(sheet).toHaveAttribute("data-snap", "peek");
+    expect(sheet).toHaveAttribute("data-snap", "bar");
   });
 
-  it("lowers the sheet when a route is picked, so the map shows it", async () => {
+  it("lowers the sheet to the bar when a route is picked, so the map shows it", async () => {
     vi.mocked(planTrip).mockResolvedValue(tripPlan());
     usePhoneLayout();
     const user = userEvent.setup();
@@ -231,10 +269,11 @@ describe("App on a phone", () => {
     await screen.findByRole("region", { name: "Route B · 15 h 10 min" });
 
     await user.click(within(sheet).getByRole("button", { name: "Show more of the trip panel" }));
+    await user.click(within(sheet).getByRole("button", { name: "Show more of the trip panel" }));
     expect(sheet).toHaveAttribute("data-snap", "half");
     await user.click(within(sheet).getByRole("button", { name: /^Route C,/ }));
 
-    expect(sheet).toHaveAttribute("data-snap", "peek");
+    expect(sheet).toHaveAttribute("data-snap", "bar");
     expect(screen.getByRole("region", { name: "Route map" })).toHaveAttribute(
       "data-selected-route",
       "C",

@@ -89,13 +89,14 @@ scrubbing makes no requests and uploads nothing, and stays at 60 frames a second
 
 `render.yaml` describes both parts on Render's free plan: the web app as a static site and the
 API as a web service. Each learns the other's address from the platform at deploy time. A free
-API instance sleeps after 15 minutes without requests; a scheduled GitHub Actions job
-(`.github/workflows/keep-warm.yml`) calls `/api/health` every 10 minutes to keep it awake, and
-the web app says the API is starting up if a visitor arrives while it wakes.
+API instance sleeps after 15 minutes without requests; an external uptime monitor calls
+`/api/health` every 5 minutes to keep it awake, with a scheduled GitHub Actions job
+(`.github/workflows/keep-warm.yml`) as a backup, and the web app says the API is starting up if
+a visitor arrives while it wakes.
 
 ## Quality checks
 
-`make check` runs what CI runs on every pull request: Ruff, mypy and pytest for the API;
-ESLint, Prettier, TypeScript, Vitest and a production build for the web app; and Playwright end
-to end tests on a desktop and a phone profile. Tests never call TomTom or Open-Meteo: recorded
-responses and fakes stand in for them.
+`make check` runs what CI runs on every pull request: Ruff, mypy and pytest for the API; ESLint,
+Prettier, TypeScript and Vitest for the web app; and Playwright end to end tests against a
+production build of the web app, on a desktop and a phone profile. Tests never call TomTom or
+Open-Meteo: recorded responses and fakes stand in for them.

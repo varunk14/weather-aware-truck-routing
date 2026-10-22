@@ -35,6 +35,59 @@
   overflow-y: auto;
 }
 
+/* The side panel hidden: the header becomes a bar across the top and the map takes the whole
+   width below it, so the API status stays in view. */
+.app[data-panel="hidden"] {
+  grid-template-areas:
+    "header"
+    "map";
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app[data-panel="hidden"] .header {
+  border-right: 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.app[data-panel="hidden"] .panel {
+  display: none;
+}
+
+/* A tab on the map's left edge that hides and shows the side panel. */
+.panelToggle {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: 0;
+  display: grid;
+  width: 24px;
+  height: 56px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-left: 0;
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: var(--color-panel);
+  box-shadow: 2px 0 8px rgb(13 30 45 / 10%);
+  color: var(--color-text-2);
+  cursor: pointer;
+  place-items: center;
+  transform: translateY(-50%);
+}
+
+.panelToggle:hover {
+  color: var(--color-text);
+}
+
+.panelToggle svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
 .mapArea {
   position: relative;
   min-width: 0;
@@ -95,6 +148,9 @@
 
 .stack {
   display: grid;
+  /* A column may shrink below its widest line, so a long place name is cut short with an
+     ellipsis instead of pushing Edit and the recommendation off the screen. */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
 }
 

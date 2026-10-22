@@ -35,24 +35,44 @@
 
 .colon {
   color: var(--color-text-2);
-  font-size: var(--text-xl);
+  font-size: 18px;
   font-weight: 600;
 }
 
 .value {
+  /* The hour and minutes are text fields; they look like the AM or PM part. */
+  width: 44px;
   min-width: 44px;
+  margin: 0;
   padding: 4px 6px;
+  border: 0;
   border-radius: 7px;
+  background: transparent;
+  caret-color: transparent;
+  font-family: inherit;
+  appearance: none;
   color: var(--color-text);
   cursor: text;
-  font-size: var(--text-xl);
+  /* 16 px or more, so a phone does not zoom in on the field. */
+  font-size: 18px;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
   line-height: 1.2;
   outline: none;
   text-align: center;
   transition: background var(--duration-fast);
+}
+
+/* AM or PM is text that cannot be selected; the hour and minutes stay selectable, since iOS
+   Safari will not type into a text field that cannot be. */
+.value:not(input) {
   user-select: none;
+}
+
+/* A field shows its value as a placeholder, in the same colour as typed digits. */
+.value::placeholder {
+  color: inherit;
+  opacity: 1;
 }
 
 .value:hover {
@@ -96,14 +116,14 @@
   stroke-width: 2;
 }
 
-/* Touch screens: steps at least 44 px tall. */
+/* Touch screens: steps at least 44 px tall, like every button on a phone. */
 @media (pointer: coarse) {
   .step {
     height: 44px;
   }
 
   .value {
-    min-height: 44px;
-    padding: 9px 6px;
+    min-height: 40px;
+    padding: 8px 6px;
   }
 }

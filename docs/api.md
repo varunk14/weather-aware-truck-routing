@@ -62,7 +62,7 @@ risk summary. One route is recommended, with a sentence explaining why.
 | `origin`, `destination` | Exactly one form: a picked suggestion (`place_id` + `place_type`), coordinates (`lat` + `lon`), or free text (`query`). They must be different places, at most 3,500 mi apart by road. |
 | `departure`             | ISO 8601. From 15 minutes ago up to 10 days ahead. A time without an offset is read as UTC.                                                                                            |
 | `load_lb`               | Whole pounds, 1 to 80,000.                                                                                                                                                             |
-| `interval_mi`           | Checkpoint spacing: 10, 25 or 50. Default 25.                                                                                                                                          |
+| `interval_mi`           | Checkpoint spacing: 10, 25 or 50. Default 25. A trip whose checkpoints need more than 450 forecast points (10 mi spacing beyond about 1,500 mi) is refused with a 400 on this field.   |
 
 ### Response
 
@@ -129,7 +129,7 @@ risk summary. One route is recommended, with a sentence explaining why.
   },
   "notes": [],
   "heatmap": {
-    "start": "2026-10-21T18:00:00+00:00",
+    "start": "2026-10-21T12:00:00+00:00",
     "frames": 50,
     "spacing_m": 20000,
     "cell_size": { "lat": 0.17966, "lon": 0.24155 },
@@ -184,7 +184,9 @@ risk summary. One route is recommended, with a sentence explaining why.
 | 502    | TomTom or Open-Meteo returned a response the API could not use, or the forecast has gaps.              |
 | 503    | TomTom or Open-Meteo is not responding or is rate limiting, or routing is not configured.              |
 
-Error bodies have a `detail` message, for example
+A 400 body names each field that was refused, with the reason, for example
+`{"interval_mi": ["Checkpoints every 10 mi need 858 forecast points on this trip; ..."]}`. Other
+error bodies have a `detail` message, for example
 `{"detail": "No truck route connects these places."}`.
 
 ## Rate limits

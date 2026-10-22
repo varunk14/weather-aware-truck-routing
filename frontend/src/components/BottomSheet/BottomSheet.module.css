@@ -51,6 +51,14 @@
   outline-offset: -4px;
 }
 
+/* The bar: what stays in view with the sheet at its lowest. */
+.bar {
+  flex: none;
+  padding: 0 var(--space-4) var(--space-3);
+  padding-right: calc(var(--space-4) + env(safe-area-inset-right));
+  padding-left: calc(var(--space-4) + env(safe-area-inset-left));
+}
+
 .peek {
   min-height: 0;
   padding: 0 var(--space-4) var(--space-3);
@@ -68,7 +76,16 @@
   overscroll-behavior: contain;
 }
 
-.sheet[data-snap="peek"] .content {
+/* A phone's keyboard covers the lower half of the screen and the page does not shrink for it.
+   While a place field is typed in, room below the content lets the field scroll to the top of
+   the sheet, so its suggestions show under it, above the keyboard. */
+.content:has([role="combobox"]:focus) {
+  padding-bottom: 75vh;
+}
+
+.sheet[data-snap="peek"] .content,
+.sheet[data-snap="bar"] .content,
+.sheet[data-snap="bar"] .peek {
   overflow: hidden;
   visibility: hidden;
 }

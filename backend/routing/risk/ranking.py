@@ -91,10 +91,15 @@ def _advantage(risk: RouteRisk, fastest: RouteOption) -> str:
             if ours == 0:
                 return f"Avoids {format_miles(theirs)} of {hazard} on {than}"
             return f"Has {format_miles(theirs - ours)} less {hazard} than {than}"
-    return (
-        f"Lower average weather risk than {than}: "
-        f"{risk.average_risk:.2f} vs {fastest.risk.average_risk:.2f}"
-    )
+    best_average, fastest_average = _averages(risk.average_risk, fastest.risk.average_risk)
+    return f"Lower average weather risk than {than}: {best_average} vs {fastest_average}"
+
+
+def _averages(ours: float, theirs: float) -> tuple[str, str]:
+    """Two averages to two decimals, or to the three the ranking uses when two look the same."""
+    if f"{ours:.2f}" != f"{theirs:.2f}":
+        return f"{ours:.2f}", f"{theirs:.2f}"
+    return f"{ours:.{RISK_DECIMALS}f}", f"{theirs:.{RISK_DECIMALS}f}"
 
 
 def format_miles(miles: float) -> str:

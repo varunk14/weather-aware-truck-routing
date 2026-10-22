@@ -28,7 +28,8 @@ from routing.services.weather import FALLBACK_HOURS, HOUR, floor_hour, total_nea
 
 FRAME_COUNT = 50
 # Each cell is one call against Open-Meteo's free limit of 600 a minute, and a plan's checkpoints
-# need up to about 200 more, so 120 cells let two new trips be planned within the same minute.
+# need about 140 more at the default spacing, so 120 cells let two new trips be planned within
+# the same minute.
 MAX_CELLS = 120
 # The same corridor and hours (another load or checkpoint spacing on the same trip) reuse the
 # forecast for this long, like plans. Forecasts are hourly, so an hour loses nothing.

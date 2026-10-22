@@ -13,6 +13,7 @@ from routing.risk import RiskLevel, RouteRisk
 from routing.services.heatmap import FRAME_COUNT, Heatmap
 from routing.services.places import Address, Coordinates, Location, PlaceRef
 from routing.services.planner import (
+    INTERVALS_MI,
     ROUTE_IDS,
     AssessedCheckpoint,
     PlannedRoute,
@@ -20,7 +21,6 @@ from routing.services.planner import (
     TripRequest,
 )
 
-INTERVALS_MI = (10, 25, 50)
 DEFAULT_INTERVAL_MI = 25
 MAX_LOAD_LB = 80_000
 # Open-Meteo forecasts 16 days ahead. Ten days leaves room for the longest trip (3,500 miles,
@@ -108,7 +108,7 @@ def plan_to_json(plan: RoutePlan) -> dict[str, Any]:
 
 
 def _heatmap_json(heatmap: Heatmap) -> dict[str, Any]:
-    """Hourly frames per cell as plain lists, which keeps 240 cells x 50 hours compact."""
+    """Hourly frames per cell as plain lists, which keeps 120 cells x 50 hours compact."""
     return {
         "start": heatmap.start.isoformat(),
         "frames": FRAME_COUNT,

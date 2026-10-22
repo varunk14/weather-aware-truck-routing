@@ -45,9 +45,30 @@ async function fillTrip(page: Page) {
   await page.getByRole("textbox", { name: "Load weight (lb)" }).fill("42,000");
 }
 
-/** On a phone the route cards sit below the peek position of the sheet; bring them up. */
+/**
+ * On a phone a plan opens with the sheet lowered to the trip's bar, and the route cards two steps
+ * up (past the recommendation); bring them up.
+ */
 async function showRoutes(page: Page, isMobile: boolean) {
-  if (isMobile) await page.getByRole("button", { name: "Show more of the trip panel" }).click();
+  if (!isMobile) return;
+  const sheet = page.getByRole("region", { name: "Trip" });
+  await expect(sheet).toHaveAttribute("data-snap", "bar");
+  const handle = page.getByRole("button", { name: "Show more of the trip panel" });
+  await handle.click();
+  await expect(sheet).toHaveAttribute("data-snap", "peek");
+  await handle.click();
+  await expect(sheet).toHaveAttribute("data-snap", "half");
+}
+
+/**
+ * The plan has arrived. On a phone its recommendation waits one step up from the bar, hidden
+ * from the accessibility tree until then, so it is looked for among hidden elements too.
+ */
+async function planShown(page: Page) {
+  await expect(
+    page.getByRole("region", { name: /^Route B · /, includeHidden: true }),
+  ).toBeAttached();
+  await expect(page.getByRole("region", { name: "Forecast timeline" })).toBeVisible();
 }
 
 test("plans a trip and recommends the safest route", async ({ page, isMobile }) => {
@@ -62,7 +83,7 @@ test("plans a trip and recommends the safest route", async ({ page, isMobile }) 
   await fillTrip(page);
   await page.getByRole("button", { name: "Plan routes" }).click();
 
-  const recommendation = page.getByRole("region", { name: /^Route B · / });
+  const recommendation = page.getByRole("region", { name: /^Route B · /, includeHidden: true });
   await expect(recommendation).toContainText("Avoids 50 mi of High-risk weather");
   expect(requests).toEqual([
     expect.objectContaining({
@@ -90,7 +111,7 @@ test("shows the forecast at a risky checkpoint", async ({ page, isMobile }) => {
   await page.goto("/");
   await fillTrip(page);
   await page.getByRole("button", { name: "Plan routes" }).click();
-  await expect(page.getByRole("region", { name: /^Route B · / })).toBeVisible();
+  await planShown(page);
 
   await showRoutes(page, isMobile);
   await page.getByRole("button", { name: /^Route A, / }).click();
@@ -140,6 +161,26 @@ test("shows the API's field messages on the form", async ({ page }) => {
   );
 });
 
+test("asks for wider checkpoints when a long trip needs too many forecast points", async ({
+  page,
+}) => {
+  const message =
+    "Checkpoints every 10 mi need 1,050 forecast points on this trip; the free weather service " +
+    "allows 450 per plan. Choose 25 mi or more.";
+  await mockApi(page, (route) => route.fulfill({ status: 400, json: { interval_mi: [message] } }));
+  await page.goto("/");
+  await fillTrip(page);
+  // The radio button sits under its label, which is what a person clicks.
+  await page
+    .locator("label")
+    .filter({ has: page.getByRole("radio", { name: "10 mi" }) })
+    .click();
+  await expect(page.getByRole("radio", { name: "10 mi" })).toBeChecked();
+  await page.getByRole("button", { name: "Plan routes" }).click();
+
+  await expect(page.getByText(message)).toBeVisible();
+});
+
 test("can cancel a slow plan", async ({ page }) => {
   await mockApi(page, () => new Promise<void>(() => undefined));
   await page.goto("/");
@@ -151,6 +192,35 @@ test("can cancel a slow plan", async ({ page }) => {
 
   await expect(page.getByRole("heading", { name: "Planning three truck routes" })).toBeHidden();
   await expect(page.getByRole("button", { name: "Plan routes" })).toBeEnabled();
+});
+
+test("hides the side panel so the map has the whole width, and shows it again", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, "Phones use the bottom sheet instead of a side panel.");
+  await mockApi(page, (route) => route.fulfill({ json: PLAN }));
+  await page.goto("/");
+  await fillTrip(page);
+  await page.getByRole("button", { name: "Plan routes" }).click();
+  await planShown(page);
+
+  const map = page.getByRole("region", { name: "Route map" });
+  const width = async () => (await map.boundingBox())?.width ?? 0;
+  const screenWidth = page.viewportSize()?.width ?? 0;
+  expect(await width()).toBeLessThan(screenWidth - 300);
+
+  const toggle = page.getByRole("button", { name: "Trip panel" });
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await toggle.click();
+  await expect(page.getByRole("region", { name: "Trip planner" })).toBeHidden();
+  await expect(page.getByRole("status")).toContainText("API online");
+  await expect.poll(width).toBe(screenWidth);
+  await expect(page.getByRole("region", { name: "Forecast timeline" })).toBeVisible();
+
+  await toggle.click();
+  await expect(page.getByRole("region", { name: /^Route B · / })).toBeVisible();
+  await expect.poll(width).toBeLessThan(screenWidth - 300);
 });
 
 test.describe("on a phone", () => {
@@ -165,18 +235,28 @@ test.describe("on a phone", () => {
     await fillTrip(page);
     await page.getByRole("button", { name: "Plan routes" }).click();
 
-    await expect(sheet).toHaveAttribute("data-snap", "peek");
+    // The plan opens lowered to the trip's bar, which leaves nearly all of the screen to the map
+    // (polled: the height animates).
+    await expect(sheet).toHaveAttribute("data-snap", "bar");
     await expect(sheet.getByText(/Seattle, WA/)).toBeVisible();
-    // At peek the sheet leaves most of the screen to the map (polled: the height animates).
+    await expect(sheet.getByRole("button", { name: "Edit" })).toBeVisible();
+    const recommendation = page.getByRole("region", { name: /^Route B · / });
+    await expect(recommendation).toBeHidden();
     const screenHeight = page.viewportSize()?.height ?? 0;
     await expect
       .poll(async () => (await sheet.boundingBox())?.height ?? Infinity)
-      .toBeLessThan(screenHeight * 0.45);
+      .toBeLessThan(screenHeight * 0.25);
+
+    // One step up shows the recommendation, with the timeline still over the map.
+    await page.getByRole("button", { name: "Show more of the trip panel" }).click();
+    await expect(sheet).toHaveAttribute("data-snap", "peek");
+    await expect(recommendation).toBeVisible();
+    await expect(page.getByRole("region", { name: "Forecast timeline" })).toBeVisible();
 
     await page.getByRole("button", { name: "Show more of the trip panel" }).click();
     await expect(sheet).toHaveAttribute("data-snap", "half");
     await page.getByRole("button", { name: /^Route C, / }).click();
-    await expect(sheet).toHaveAttribute("data-snap", "peek");
+    await expect(sheet).toHaveAttribute("data-snap", "bar");
   });
 
   test("gives every button a touch target of at least 44 px", async ({ page }) => {
@@ -184,8 +264,8 @@ test.describe("on a phone", () => {
     await page.goto("/");
     await fillTrip(page);
     await page.getByRole("button", { name: "Plan routes" }).click();
-    await expect(page.getByRole("region", { name: /^Route B · / })).toBeVisible();
-    await page.getByRole("button", { name: "Show more of the trip panel" }).click();
+    await planShown(page);
+    await showRoutes(page, true);
 
     const buttons = page.getByRole("region", { name: "Trip" }).getByRole("button");
     // Every laid-out button in the sheet, including those scrolled below the fold.
@@ -197,6 +277,42 @@ test.describe("on a phone", () => {
     );
     expect(sizes.length).toBeGreaterThan(5);
     for (const size of sizes) expect(size).toBeGreaterThanOrEqual(44);
+  });
+
+  test("keeps Edit and the recommendation on screen with very long place names", async ({
+    page,
+  }) => {
+    const plan = PLAN as { origin: { title: string }; destination: { title: string } };
+    const longNames = {
+      ...plan,
+      origin: { ...plan.origin, title: "California Academy of Sciences, Golden Gate Park" },
+      destination: { ...plan.destination, title: "Salt Lake City International Airport, UT" },
+    };
+    await mockApi(page, (route) => route.fulfill({ json: longNames }));
+    await page.goto("/");
+    await fillTrip(page);
+    await page.getByRole("button", { name: "Plan routes" }).click();
+
+    const edit = page.getByRole("button", { name: "Edit" });
+    await expect(edit).toBeVisible();
+    const viewport = page.viewportSize()?.width ?? 0;
+    const box = await edit.boundingBox();
+    expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(viewport);
+    const sheet = page.getByRole("region", { name: "Trip" });
+    // Nothing in the sheet reaches past its edge, lowered and again raised with the route cards.
+    for (const raise of [false, true]) {
+      if (raise) await page.getByRole("button", { name: "Show more of the trip panel" }).click();
+      const edges = await sheet.evaluate((element) => ({
+        sheet: element.getBoundingClientRect().right,
+        widest: Math.max(
+          ...[...element.querySelectorAll("*")].map((e) => e.getBoundingClientRect().right),
+        ),
+      }));
+      expect(edges.widest).toBeLessThanOrEqual(edges.sheet + 1);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      viewport,
+    );
   });
 
   test("gives the forecast timeline touch targets of at least 44 px", async ({ page }) => {
@@ -275,7 +391,7 @@ test("never scrolls sideways once a plan is shown", async ({ page }) => {
   await page.goto("/");
   await fillTrip(page);
   await page.getByRole("button", { name: "Plan routes" }).click();
-  await expect(page.getByRole("region", { name: /^Route B · / })).toBeVisible();
+  await planShown(page);
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);

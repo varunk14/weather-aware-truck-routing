@@ -9,6 +9,8 @@ export interface TruckPosition {
   lngLat: [number, number];
   mile: number;
   status: "driving" | "arrived";
+  /** Which way the truck points on the map, so it never drives backwards. */
+  facing: "left" | "right";
 }
 
 const EARTH_RADIUS_MI = 3_958.8;
@@ -32,7 +34,8 @@ export function truckAt(route: PlannedRoute, hours: number): TruckPosition {
   const end = coordinates[coordinates.length - 1] ?? [0, 0];
   const last = checkpoints[checkpoints.length - 1];
   if (!last || moment >= Date.parse(last.eta) || moment >= Date.parse(route.arrival)) {
-    return { lngLat: end, mile: route.distance_mi, status: "arrived" };
+    const mile = route.distance_mi;
+    return { lngLat: end, mile, status: "arrived", facing: facingAt(route, mile) };
   }
 
   let mile = 0;
@@ -48,7 +51,25 @@ export function truckAt(route: PlannedRoute, hours: number): TruckPosition {
       break;
     }
   }
-  return { lngLat: pointAtMile(coordinates, mile, route.distance_mi), mile, status: "driving" };
+  return {
+    lngLat: pointAtMile(coordinates, mile, route.distance_mi),
+    mile,
+    status: "driving",
+    facing: facingAt(route, mile),
+  };
+}
+
+/**
+ * Left or right on the map, from the road behind the truck to the road ahead. The stretch is
+ * 2% of the trip each way, so a short bend in a city street does not turn the truck around.
+ */
+function facingAt(route: PlannedRoute, mile: number): "left" | "right" {
+  const routeMi = route.distance_mi;
+  const step = Math.max(routeMi / 50, 1);
+  const coordinates = route.geometry.coordinates;
+  const behind = pointAtMile(coordinates, Math.max(mile - step, 0), routeMi);
+  const ahead = pointAtMile(coordinates, Math.min(mile + step, routeMi), routeMi);
+  return ahead[0] < behind[0] ? "left" : "right";
 }
 
 interface Segment {

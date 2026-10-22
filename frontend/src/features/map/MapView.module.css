@@ -46,6 +46,11 @@
   fill: var(--color-surface);
 }
 
+/* The drawing faces right; mirrored, it faces left, so the truck never drives backwards. */
+.truck[data-facing="left"] svg {
+  transform: scaleX(-1);
+}
+
 .fallback {
   position: absolute;
   inset: 0;

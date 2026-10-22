@@ -1,8 +1,7 @@
 # Design decisions
 
 This document records how the specification was interpreted where it leaves room for judgement,
-and the main technical choices behind Clearway. Entries describe the intended behaviour; the
-README states what is implemented so far.
+and the main technical choices behind Clearway.
 
 ## Interpreting the specification
 
@@ -143,10 +142,11 @@ returned without a heatmap and the timeline says so.
 The web app is served as a static site and the API as a separate web service, both on Render's
 free plan (`render.yaml`). The web app calls the API directly, which allows only the web app's
 origin; a rewrite through the static site was not used, so a long plan never depends on a
-proxy's time limit. A free API instance sleeps after 15 minutes idle, so a scheduled GitHub
-Actions job calls the health endpoint every 10 minutes, which stays inside the free 750
-instance hours a month. The API runs as one Gunicorn process with threads, so every request
-shares the in-memory cache.
+proxy's time limit. A free API instance sleeps after 15 minutes idle, so an external uptime
+monitor calls the health endpoint every 5 minutes, which stays inside the free 750 instance
+hours a month. A scheduled GitHub Actions job does the same as a backup only: GitHub starts
+scheduled jobs on a best-effort basis, and in practice they ran hours apart. The API runs as one
+Gunicorn process with threads, so every request shares the in-memory cache.
 
 ### 26. Django 5.2 LTS without a database
 
@@ -254,10 +254,15 @@ profile.
 ### 41. A bottom sheet on phones
 
 On phones the map fills the screen and the trip sits in a sheet over it, as in map apps. The sheet
-has three positions: a peek with the trip summary and the recommendation, half height with the
-route cards, and full height with everything, including the trip form. Its handle is a button
-(tap to cycle, arrow keys to step) and it can also be dragged. Picking a route or a checkpoint
-lowers the sheet so the map shows it. Wider screens keep the side panel.
+has four positions: a bar with only the trip summary and Edit, a peek that adds the
+recommendation, half height with the route cards, and full height with everything, including
+the trip form. Its handle is a button (tap to cycle, arrow keys to step) and it can also be
+dragged. A new plan opens at the bar, and picking a route or a checkpoint lowers the sheet to the
+bar, so the routes have most of the screen; the recommendation is one tap away. A phone's keyboard
+covers the page rather than shrinking it, so nothing moves under the finger while typing: a
+place field moves to the top of the sheet as it is tapped, and its suggestions end above the
+keyboard and scroll. Wider screens keep the side panel, which a tab on the map's edge hides so
+the map has the whole width.
 
 ### 42. Everything on the map is also in the panel
 
@@ -273,9 +278,9 @@ The departure is entered in the viewer's own time, which the form says.
 
 ### 44. Waiting is explained
 
-A plan takes about three to five seconds, mostly for routing, and up to 20 for very long trips. The panel says what is happening, counts
-the seconds, says so if a service is slow, and can be cancelled. A cancelled request leaves the
-previous plan on screen.
+A plan takes about three to five seconds, mostly for routing, and up to 20 for very long trips. The
+panel says what is happening, counts the seconds, says so if a service is slow, and can be
+cancelled. A cancelled request leaves the previous plan on screen.
 
 ### 45. A calendar for the departure
 
@@ -284,8 +289,10 @@ uses its own picker, laid out like the browser's: a month calendar, with arrows 
 month, in which only the allowed days (now to ten days ahead) can be chosen, and a time typed or
 stepped like the browser's time input. The hour, minutes and AM or PM each take typed digits and
 the up and down arrows, with buttons above and below for a mouse or a finger. Any minute can be
-chosen. A time that has passed is marked and Done waits until it is fixed. The departure changes
-only on Done; Cancel, Escape or a click outside leave it as it was.
+chosen. On a phone the hour and minutes open the number keypad; nothing in them is selected (so
+no cut and paste bar appears), and focus stays in the text fields so the keyboard does not close
+and reopen while the time is typed. A time that has passed is marked and Done waits until it is
+fixed. The departure changes only on Done; Cancel, Escape or a click outside leave it as it was.
 
 ### 46. The heatmap corridor
 
@@ -298,12 +305,12 @@ them, which covers any moment in the first 48 hours.
 
 ### 47. What the slider shows between hours
 
-Dragging the slider moves it in tenths of an hour; the arrow keys move it half an hour, Page Up
-and Page Down six hours, Home and End to the ends. Wind, rain and snow are blended between the two hourly
-frames around the slider's time. Risk is a level, not a quantity, so it is not blended: it comes
-from the frame whose hour contains the slider's time, the same rule the checkpoints use for rain
-and snow. Moving the slider only changes the map's colour expression; the frames are uploaded to
-the map once per plan.
+Dragging the slider moves it in tenths of an hour; the arrow keys move it half an hour, Page Up and
+Page Down six hours, Home and End to the ends. Wind, rain and snow are blended between the two
+hourly frames around the slider's time. Risk is a level, not a quantity, so it is not blended: it
+comes from the frame whose hour contains the slider's time, the same rule the checkpoints use for
+rain and snow. Moving the slider only changes the map's colour expression; the frames are uploaded
+to the map once per plan.
 
 ### 48. The truck on the timeline
 
@@ -312,18 +319,50 @@ checkpoints' arrival times, so it moves at the pace TomTom expects, slower in tr
 slider always runs 48 hours, the forecast window the specification asks for, so a shorter trip
 arrives part way along it: a mark on the track and the text ("arrives at +24.5 h") say when.
 Playing runs the 48 hours in 12 seconds. On a phone the timeline floats above the lowered sheet
-and hides while the sheet is raised or a checkpoint's details are open, when it would cover most
-of the map; hiding it pauses playing and hides the heatmap, which is never shown without its
-legend.
+(at the bar or the peek) and hides while the sheet is raised further or a checkpoint's details
+are open, when it would cover most of the map; hiding it pauses playing and hides the heatmap,
+which is never shown without its legend. The truck faces left or right by the direction of the
+road over 2% of the trip around it, so it points towards the destination and a short bend in a
+city street does not turn it around.
 
 ### 49. At most 120 heatmap cells
 
 Open-Meteo's free plan allows 600 calls a minute, one per forecast location. A plan's checkpoints
-need up to about 200 locations, and with 200 heatmap cells a long trip used about 400 calls, so
-a second new trip planned within the same minute came back without its heatmap (its routes and
-recommendation were unaffected). With at most 120 cells a plan uses about 250 to 320 calls and
-two new trips fit in a minute. The cost is coarser cells on long trips only (about 135 km instead
+need about 140 locations at the default 25 mile spacing (at most 450 at any spacing, see 34),
+and with 200 heatmap cells a long trip used about 400 calls, so a second new trip planned within
+the same minute came back without its heatmap (its routes and recommendation were unaffected).
+With at most 120 cells a plan at the default spacing uses about 250 to 320 calls and two new
+trips fit in a minute. The cost is coarser cells on long trips only (about 135 km instead
 of 95 km from Los Angeles to Houston); trips of a few hundred miles keep their 20 km cells, and
 the checkpoints, which decide the recommendation, are not affected. Repeating a trip within the
 hour costs nothing, since plans and corridor forecasts are cached. A paid Open-Meteo plan would
 remove the limit.
+
+The same limit caps the checkpoints: the three routes together may use at most 450 forecast
+points, so with the heatmap a plan stays under 600. At 25 or 50 mile spacing every trip up to
+3,500 miles fits; at 10 miles the limit is reached at roughly 1,500 miles. Such a plan is refused
+after routing and before any weather is fetched, with a message on the checkpoint field that
+names the spacing that fits ("Choose 25 mi or more"), rather than failing later as "busy".
+
+### 50. Typed places use the first suggestion
+
+A place typed without picking a suggestion is resolved to the place the suggestions list would
+have offered first; TomTom's address lookup is used only when there is no suggestion. The address
+lookup alone does not know places by name: "California Academy of Sciences" became a street of
+that name in Wisconsin. The resolved name is shown in the trip summary, so a surprise is visible.
+
+### 51. Close average risks are shown to three decimals
+
+Routes rank by average risk to three decimals. When the recommendation's reason compares two
+averages that are equal to two decimals (0.09 against 0.09), it shows the third (0.090 against
+0.094), so the sentence never reads as if the numbers were the same.
+
+### 52. The map keeps the routes framed until the user moves it
+
+The map frames the routes when a plan arrives or a route is picked. Until the user drags or
+zooms it, it frames them again whenever the space around them changes: the phone's sheet moves,
+the side panel is hidden or the window is resized. Picking a checkpoint centres the map on it
+and ends this, like a move by the user. After the user moves the map it stays where
+the user put it. The room kept for the sheet and the timeline is also shrunk when it would leave
+the routes less than a quarter of the map, since MapLibre frames nothing at all when the padding
+leaves no room, which on a short phone left the camera on its starting view.

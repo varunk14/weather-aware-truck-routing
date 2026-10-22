@@ -1,9 +1,9 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { BottomSheet, type SheetSnap } from "./BottomSheet";
+import { BottomSheet, MOVE_MS, type SheetSnap } from "./BottomSheet";
 
 const CONTAINER_HEIGHT = 800;
 const PEEK_CONTENT_HEIGHT = 150;
@@ -162,6 +162,79 @@ describe("BottomSheet", () => {
     expect(screen.getByRole("button", { name: "Edit" }).parentElement).toHaveStyle({
       maxHeight: "316px",
     });
+  });
+
+  it("with a bar, lowers to only the bar and cycles bar, peek, half, full", async () => {
+    function WithBar() {
+      const [snap, setSnap] = useState<SheetSnap>("bar");
+      return (
+        <div>
+          <BottomSheet
+            label="Trip"
+            snap={snap}
+            onSnapChange={setSnap}
+            bar={<p>Denver to Chicago</p>}
+            peek={<button type="button">Why Route A</button>}
+          >
+            <button type="button">Route A</button>
+          </BottomSheet>
+        </div>
+      );
+    }
+    const user = userEvent.setup();
+    render(<WithBar />);
+    const handle = screen.getByRole("button", { name: /trip panel/ });
+
+    // The handle and the 150 px bar; the peek content and the rest are out of reach.
+    expect(sheet()).toHaveStyle({ height: "194px" });
+    expect(screen.getByText("Denver to Chicago").closest("[inert]")).toBeNull();
+    expect(screen.getByRole("button", { name: "Why Route A" }).closest("[inert]")).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Route A" }).closest("[inert]")).not.toBeNull();
+
+    await user.click(handle);
+    expect(sheet()).toHaveAttribute("data-snap", "peek");
+    expect(sheet()).toHaveStyle({ height: "344px" });
+    expect(screen.getByRole("button", { name: "Why Route A" }).closest("[inert]")).toBeNull();
+
+    await user.click(handle);
+    await user.click(handle);
+    expect(sheet()).toHaveAttribute("data-snap", "full");
+    await user.click(handle);
+    expect(sheet()).toHaveAttribute("data-snap", "bar");
+
+    handle.focus();
+    await user.keyboard("{ArrowUp}{ArrowDown}{ArrowDown}");
+    expect(sheet()).toHaveAttribute("data-snap", "bar");
+  });
+
+  it("shows its lowest position, the peek, when asked for a bar it does not have", () => {
+    render(<BottomSheet label="Trip" snap="bar" onSnapChange={vi.fn()} peek="Plan a trip" />);
+
+    expect(sheet()).toHaveAttribute("data-snap", "peek");
+    expect(sheet()).toHaveStyle({ height: "194px" });
+  });
+
+  it("glides only to a new position, not when the screen changes size under it", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<Harness />);
+    // Measured, and ready to animate, but not moving.
+    await new Promise((done) => requestAnimationFrame(done));
+    expect(sheet()).not.toHaveAttribute("data-animated");
+
+    await user.click(screen.getByRole("button", { name: /trip panel/ }));
+    expect(sheet()).toHaveAttribute("data-animated");
+    await waitFor(
+      () => {
+        expect(sheet()).not.toHaveAttribute("data-animated");
+      },
+      { timeout: MOVE_MS * 3 },
+    );
+
+    // A phone's keyboard opens: the sheet takes its new height at once.
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(500);
+    rerender(<Harness />);
+    expect(sheet()).toHaveStyle({ height: "275px" });
+    expect(sheet()).not.toHaveAttribute("data-animated");
   });
 
   it("reports its settled height", () => {

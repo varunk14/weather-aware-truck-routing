@@ -67,5 +67,5 @@ class RoutesView(APIView):
                 clients.tomtom_client(), clients.open_meteo_client(), serializer.to_trip()
             )
         except TripError as error:
-            raise serializers.ValidationError({"destination": [str(error)]}) from error
+            raise serializers.ValidationError({error.field: [str(error)]}) from error
         return Response(plan_to_json(plan))

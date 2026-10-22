@@ -29,7 +29,9 @@ risk from wind, rain, snow and the load weight, and recommends the safest route.
 - **A weather heatmap** along the trip corridor, with a 0 to 48 hour slider (play, and Risk,
   Wind, Rain or Snow) and the truck's position at that hour. Every hour loads with the plan, so
   the slider never waits for the network.
-- **Phones:** the map fills the screen and the plan sits in a sheet that slides up.
+- **Phones:** the map fills the screen and the plan sits in a sheet that slides up; after
+  planning it lowers to a slim bar with the trip summary, so the routes have most of the
+  screen. On a computer the side panel can be hidden for a full-width map.
 
 | Condition    | Low    | Moderate    | High        | Severe      | No Travel |
 | ------------ | ------ | ----------- | ----------- | ----------- | --------- |
@@ -104,9 +106,11 @@ Both parts run on [Render](https://render.com)'s free plan, described in
 1. In the Render Dashboard choose **New > Blueprint** and pick this repository.
 2. Enter `TOMTOM_API_KEY` when asked. The Django secret key is generated, and each service gets
    the other's address (for the API's allowed origin and the web app's API address) from Render.
-3. To keep the free API awake, add a repository variable `API_HEALTH_URL` with the API's
-   health address (for example `https://clearway-api.onrender.com/api/health`); the
-   `keep-warm` workflow then calls it every 10 minutes.
+3. To keep the free API awake, point a free uptime monitor (for example UptimeRobot or
+   cron-job.org) at the API's health address (for example
+   `https://clearway-api.onrender.com/api/health`) every 5 minutes. As a backup, add a
+   repository variable `API_HEALTH_URL` with the same address and the `keep-warm` workflow
+   calls it too, though GitHub runs scheduled jobs late or skips them when busy.
 
 A free instance that has slept takes about a minute to wake; the web app says so meanwhile. On
 the very first deploy the API can fail once while the web app does not exist yet (its address is
@@ -140,12 +144,15 @@ Weather comes from Open-Meteo, which needs no key.
 - Trips can start and end anywhere TomTom has truck routing, up to 3,500 miles apart. Units are
   US customary everywhere (miles, mph, inches, pounds), as in the specification. Very long trips
   (2,000 miles or more) can take up to about 20 seconds to plan; most trips take 3 to 5.
-- Open-Meteo's free tier allows 600 calls a minute and 10,000 a day, counted per location. A
-  cross-country trip needs about 70 checkpoint locations at 50 mile spacing, 140 at 25 miles and
-  350 at 10 miles, plus up to 120 heatmap cells, so the hosted demo handles two new trips a
-  minute and roughly 38 new default trips a day. A trip planned beyond that comes back without
-  its heatmap, or says the weather service is busy. Repeated trips are served from a one hour
-  cache.
+- Open-Meteo's free tier allows 600 calls a minute and 10,000 a day, counted per location. Chicago
+  to Denver (about 1,000 miles) needs about 70 checkpoint locations at 50 mile spacing, 140 at 25
+  miles and 350 at 10 miles, plus up to 120 heatmap cells, so at the default spacing the hosted
+  demo handles two new trips a minute and roughly 38 new trips a day. A trip planned beyond that
+  comes back without its heatmap, or says the weather service is busy. Repeated trips are served
+  from a one hour cache.
+- Checkpoints every 10 miles fit trips up to roughly 1,500 miles; a longer trip at that spacing
+  is asked to use 25 or 50 miles, because its checkpoints would need more forecast points than
+  the free weather service allows in a minute.
 - Heatmap cells grow with the trip, from 20 km on short trips to about 135 km across the
   country, so local weather on a long trip is averaged over a large square. The checkpoints,
   which decide the recommendation, are not affected.
