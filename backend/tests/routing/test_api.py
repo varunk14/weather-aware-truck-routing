@@ -122,7 +122,28 @@ class TestRoutes:
         assert response.json()["destination"]["title"] == "Milwaukee, WI"
         assert api_tomtom.count("details") == 1
 
-    def test_geocodes_free_text(self, client: Client, api_tomtom: FakeTomTom) -> None:
+    def test_free_text_takes_the_place_the_suggestions_would_offer_first(
+        self, client: Client, api_tomtom: FakeTomTom
+    ) -> None:
+        response = post(client, trip(destination={"query": "Milwaukee"}))
+
+        assert response.status_code == 200
+        assert response.json()["destination"]["title"] == "Milwaukee, WI"
+        assert (api_tomtom.count("suggest"), api_tomtom.count("details")) == (1, 1)
+        assert api_tomtom.count("geocode") == 0
+
+    @pytest.mark.parametrize(
+        "suggest",
+        [
+            {"status": 200, "body": {"results": []}},
+            {"status": 503, "body": None},
+        ],
+    )
+    def test_free_text_falls_back_to_the_address_lookup(
+        self, client: Client, api_tomtom: FakeTomTom, suggest: dict[str, Any]
+    ) -> None:
+        api_tomtom.respond("suggest", suggest["status"], suggest["body"])
+
         response = post(client, trip(destination={"query": "Milwaukee, WI"}))
 
         assert response.status_code == 200
@@ -489,6 +510,7 @@ class TestErrors:
         assert response.json() == {"detail": "No truck route connects these places."}
 
     def test_unknown_place(self, client: Client, api_tomtom: FakeTomTom) -> None:
+        api_tomtom.respond("suggest", body={"results": []})
         api_tomtom.respond("geocode", body={"results": []})
 
         response = post(client, trip(origin={"query": "Nowhere"}))
