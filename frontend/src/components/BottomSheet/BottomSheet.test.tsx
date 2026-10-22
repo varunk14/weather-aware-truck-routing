@@ -164,6 +164,56 @@ describe("BottomSheet", () => {
     });
   });
 
+  it("with a bar, lowers to only the bar and cycles bar, peek, half, full", async () => {
+    function WithBar() {
+      const [snap, setSnap] = useState<SheetSnap>("bar");
+      return (
+        <div>
+          <BottomSheet
+            label="Trip"
+            snap={snap}
+            onSnapChange={setSnap}
+            bar={<p>Denver to Chicago</p>}
+            peek={<button type="button">Why Route A</button>}
+          >
+            <button type="button">Route A</button>
+          </BottomSheet>
+        </div>
+      );
+    }
+    const user = userEvent.setup();
+    render(<WithBar />);
+    const handle = screen.getByRole("button", { name: /trip panel/ });
+
+    // The handle and the 150 px bar; the peek content and the rest are out of reach.
+    expect(sheet()).toHaveStyle({ height: "194px" });
+    expect(screen.getByText("Denver to Chicago").closest("[inert]")).toBeNull();
+    expect(screen.getByRole("button", { name: "Why Route A" }).closest("[inert]")).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Route A" }).closest("[inert]")).not.toBeNull();
+
+    await user.click(handle);
+    expect(sheet()).toHaveAttribute("data-snap", "peek");
+    expect(sheet()).toHaveStyle({ height: "344px" });
+    expect(screen.getByRole("button", { name: "Why Route A" }).closest("[inert]")).toBeNull();
+
+    await user.click(handle);
+    await user.click(handle);
+    expect(sheet()).toHaveAttribute("data-snap", "full");
+    await user.click(handle);
+    expect(sheet()).toHaveAttribute("data-snap", "bar");
+
+    handle.focus();
+    await user.keyboard("{ArrowUp}{ArrowDown}{ArrowDown}");
+    expect(sheet()).toHaveAttribute("data-snap", "bar");
+  });
+
+  it("shows its lowest position, the peek, when asked for a bar it does not have", () => {
+    render(<BottomSheet label="Trip" snap="bar" onSnapChange={vi.fn()} peek="Plan a trip" />);
+
+    expect(sheet()).toHaveAttribute("data-snap", "peek");
+    expect(sheet()).toHaveStyle({ height: "194px" });
+  });
+
   it("reports its settled height", () => {
     const onHeightChange = vi.fn();
     const sheetAt = (snap: SheetSnap) => (

@@ -1,4 +1,4 @@
-import { lazy, type ReactNode, Suspense, useCallback, useMemo, useState } from "react";
+import { lazy, type ReactNode, Suspense, useCallback, useId, useMemo, useState } from "react";
 
 import { AppHeader } from "../components/AppHeader/AppHeader";
 import { Attribution } from "../components/Attribution/Attribution";
@@ -27,13 +27,16 @@ import styles from "./App.module.css";
 // MapLibre is the largest dependency; loading it separately keeps the first paint fast.
 const MapView = lazy(() => import("../features/map/MapView"));
 
-/** What the phone's bottom sheet shows, and where it starts for each. */
+/**
+ * What the phone's bottom sheet shows, and where it starts for each. Results start lowered to
+ * the trip's bar, so the routes have most of the screen; the handle brings the rest up.
+ */
 type SheetView = "form" | "loading" | "error" | "results";
 const SHEET_START: Record<SheetView, SheetSnap> = {
   form: "full",
   loading: "peek",
   error: "peek",
-  results: "peek",
+  results: "bar",
 };
 
 const DESKTOP_EDGE = 48;
@@ -72,6 +75,9 @@ export function App() {
   const plan = state.status === "success" ? state.plan : null;
   const failed = state.status === "error" && state.error?.status !== 400 ? state.error : null;
   const [editing, setEditing] = useState(false);
+  // On larger screens the side panel can be hidden, so the map has the whole width.
+  const [panelOpen, setPanelOpen] = useState(true);
+  const panelId = useId();
 
   // The selection belongs to one plan; a new plan starts from its recommended route.
   const [selection, setSelection] = useState<Selection>({
@@ -124,9 +130,10 @@ export function App() {
   // The timeline shows with a plan's results; on a phone only with the sheet lowered, since any
   // higher it would cover most of the map.
   // An open checkpoint's details take the top of a phone's map, so the timeline makes way.
+  const sheetLowered = snap === "bar" || snap === "peek";
   const showTimeline =
     Boolean(plan && route) &&
-    (!phone || (view === "results" && snap === "peek" && current.checkpoint === null));
+    (!phone || (view === "results" && sheetLowered && current.checkpoint === null));
   // Hiding the timeline pauses it, so it never starts playing again by itself when it returns.
   if (!showTimeline && shownForecast.playing) {
     setForecast({ ...shownForecast, playing: false });
@@ -161,14 +168,15 @@ export function App() {
     return valid;
   }
 
+  // Picking a route or a checkpoint on a phone lowers the sheet to its bar, so the map shows it.
   function selectRoute(routeId: string) {
     setSelection({ plan, routeId, checkpoint: null });
-    if (phone) setSnap("peek");
+    if (phone) setSnap("bar");
   }
 
   function selectCheckpoint(checkpoint: number) {
     setSelection({ ...current, checkpoint });
-    if (phone) setSnap("peek");
+    if (phone) setSnap("bar");
   }
 
   const form = (
@@ -218,7 +226,7 @@ export function App() {
     </div>
   );
 
-  const sheetContent: Record<SheetView, { peek: ReactNode; body: ReactNode }> = {
+  const sheetContent: Record<SheetView, { bar?: ReactNode; peek: ReactNode; body: ReactNode }> = {
     form: {
       peek: (
         <div className={styles.sheetTitle}>
@@ -262,17 +270,15 @@ export function App() {
       body: null,
     },
     results: {
-      peek: plan && (
-        <div className={styles.stack}>
-          <TripSummary
-            plan={plan}
-            onEdit={() => {
-              setEditing(true);
-            }}
-          />
-          <Recommendation plan={plan} />
-        </div>
+      bar: plan && (
+        <TripSummary
+          plan={plan}
+          onEdit={() => {
+            setEditing(true);
+          }}
+        />
       ),
+      peek: plan && <Recommendation plan={plan} />,
       body: (
         <>
           {results}
@@ -284,12 +290,12 @@ export function App() {
 
   // One tree for both layouts, so the map survives a rotation or resize across the breakpoint.
   return (
-    <main className={styles.app}>
+    <main className={styles.app} data-panel={phone || panelOpen ? undefined : "hidden"}>
       <div className={styles.header}>
         <AppHeader apiStatus={apiStatus} />
       </div>
       {phone ? null : (
-        <section className={styles.panel} aria-label="Trip planner">
+        <section id={panelId} className={styles.panel} aria-label="Trip planner">
           {form}
           {loading}
           {failed && <ErrorState error={failed} onRetry={retry} />}
@@ -299,6 +305,23 @@ export function App() {
         </section>
       )}
       <div className={styles.mapArea}>
+        {phone ? null : (
+          <button
+            type="button"
+            className={styles.panelToggle}
+            aria-label="Trip panel"
+            aria-expanded={panelOpen}
+            aria-controls={panelId}
+            title={panelOpen ? "Hide the trip panel" : "Show the trip panel"}
+            onClick={() => {
+              setPanelOpen(!panelOpen);
+            }}
+          >
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d={panelOpen ? "M10 4l-4 4 4 4" : "M6 4l4 4-4 4"} />
+            </svg>
+          </button>
+        )}
         <ErrorBoundary
           fallback={
             <div className={styles.mapProblem} role="region" aria-label="Route map">
@@ -344,6 +367,7 @@ export function App() {
             snap={snap}
             onSnapChange={setSnap}
             onHeightChange={setSheetHeight}
+            bar={sheetContent[view].bar}
             peek={sheetContent[view].peek}
           >
             {sheetContent[view].body}
