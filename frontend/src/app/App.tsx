@@ -316,7 +316,7 @@ export function App() {
               onSelectCheckpoint={selectCheckpoint}
               heatLayer={showTimeline ? heatLayer : null}
               hour={shownForecast.hour}
-              truck={showTimeline ? (truck?.lngLat ?? null) : null}
+              truck={showTimeline ? truck : null}
             />
           </Suspense>
         </ErrorBoundary>

@@ -14,7 +14,12 @@ function setup(overrides: Partial<Parameters<typeof Timeline>[0]> = {}) {
     layer: "risk" as const,
     onLayerChange: vi.fn(),
     routeId: "B",
-    truck: { lngLat: [-121.5, 46.5] as [number, number], mile: 312.4, status: "driving" as const },
+    truck: {
+      lngLat: [-121.5, 46.5] as [number, number],
+      mile: 312.4,
+      status: "driving" as const,
+      facing: "right" as const,
+    },
     arrivalHour: 24.5,
     heatmap: true,
     ...overrides,
@@ -39,7 +44,7 @@ describe("Timeline", () => {
   });
 
   it("says when the truck has arrived", () => {
-    setup({ truck: { lngLat: [-121, 46], mile: 100, status: "arrived" } });
+    setup({ truck: { lngLat: [-121, 46], mile: 100, status: "arrived", facing: "right" } });
     expect(screen.getByText("Route B arrived at +24.5 h")).toBeInTheDocument();
   });
 

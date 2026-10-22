@@ -23,7 +23,7 @@ const mapInstance = vi.hoisted(() => {
     sources,
     renderedFeatures: new Map<string, unknown[]>(),
     tooltips: [] as string[],
-    markers: [] as { lngLat: unknown; removed: boolean }[],
+    markers: [] as { lngLat: unknown; removed: boolean; element?: HTMLElement }[],
     addControl: vi.fn(),
     addLayer: vi.fn(),
     addSource: vi.fn((id: string) => {
@@ -57,9 +57,13 @@ vi.mock("maplibre-gl", () => {
     }
   }
   class MockMarker {
-    record = { lngLat: null as unknown, removed: false };
-    constructor() {
+    record: { lngLat: unknown; removed: boolean; element?: HTMLElement };
+    constructor(options: { element: HTMLElement }) {
+      this.record = { lngLat: null, removed: false, element: options.element };
       mapInstance.markers.push(this.record);
+    }
+    getElement() {
+      return this.record.element;
     }
     setLngLat(lngLat: unknown) {
       this.record.lngLat = lngLat;
@@ -418,15 +422,21 @@ describe("MapView", () => {
     expect(mapInstance.setPaintProperty).not.toHaveBeenCalled();
   });
 
-  it("shows the truck where it is told and hides it when there is none", () => {
+  it("shows the truck where it is told, facing its way, and hides it when there is none", () => {
     const plan = tripPlan();
-    const { rerender } = render(<MapView plan={plan} truck={[-122, 47]} />);
+    const { rerender } = render(
+      <MapView plan={plan} truck={{ lngLat: [-122, 47], facing: "right" }} />,
+    );
     loadMap();
 
-    expect(mapInstance.markers).toEqual([{ lngLat: [-122, 47], removed: false }]);
+    expect(mapInstance.markers).toHaveLength(1);
+    expect(mapInstance.markers[0]?.lngLat).toEqual([-122, 47]);
+    expect(mapInstance.markers[0]?.element?.dataset.facing).toBe("right");
 
-    rerender(<MapView plan={plan} truck={[-121.5, 46.5]} />);
-    expect(mapInstance.markers).toEqual([{ lngLat: [-121.5, 46.5], removed: false }]);
+    rerender(<MapView plan={plan} truck={{ lngLat: [-121.5, 46.5], facing: "left" }} />);
+    expect(mapInstance.markers).toHaveLength(1);
+    expect(mapInstance.markers[0]?.lngLat).toEqual([-121.5, 46.5]);
+    expect(mapInstance.markers[0]?.element?.dataset.facing).toBe("left");
 
     rerender(<MapView plan={plan} truck={null} />);
     expect(mapInstance.markers[0]?.removed).toBe(true);

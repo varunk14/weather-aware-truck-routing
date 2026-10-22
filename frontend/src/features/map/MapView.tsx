@@ -60,8 +60,8 @@ interface MapViewProps {
   heatLayer?: HeatLayer | null;
   /** Hours after departure shown by the heatmap (the slider). */
   hour?: number;
-  /** Where the truck is at that hour, or null to hide it. */
-  truck?: [number, number] | null;
+  /** Where the truck is at that hour and which way it points, or null to hide it. */
+  truck?: { lngLat: [number, number]; facing: "left" | "right" } | null;
 }
 
 /** A navy tile with a white truck, unlike the round start and end markers. */
@@ -241,8 +241,11 @@ export default function MapView({
       truckMarker.current = null;
       return;
     }
-    truckMarker.current ??= new Marker({ element: truckElement() }).setLngLat(truck).addTo(map);
-    truckMarker.current.setLngLat(truck);
+    truckMarker.current ??= new Marker({ element: truckElement() })
+      .setLngLat(truck.lngLat)
+      .addTo(map);
+    truckMarker.current.setLngLat(truck.lngLat);
+    truckMarker.current.getElement().dataset.facing = truck.facing;
   }, [loaded, truck]);
 
   // Move the camera: to all routes when a plan arrives, to a route when the user picks another,

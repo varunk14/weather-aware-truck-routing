@@ -22,7 +22,12 @@ function route(overrides: Partial<PlannedRoute> = {}): PlannedRoute {
 
 describe("truckAt", () => {
   it("starts at the origin", () => {
-    expect(truckAt(route(), 0)).toEqual({ lngLat: [-122, 47], mile: 0, status: "driving" });
+    expect(truckAt(route(), 0)).toEqual({
+      lngLat: [-122, 47],
+      mile: 0,
+      status: "driving",
+      facing: "right",
+    });
   });
 
   it("moves between checkpoints at the pace their arrival times give", () => {
@@ -43,7 +48,60 @@ describe("truckAt", () => {
   });
 
   it("waits at the destination once it has arrived", () => {
-    expect(truckAt(route(), 2)).toEqual({ lngLat: [-121, 46], mile: 100, status: "arrived" });
+    expect(truckAt(route(), 2)).toEqual({
+      lngLat: [-121, 46],
+      mile: 100,
+      status: "arrived",
+      facing: "right",
+    });
     expect(truckAt(route(), 30).status).toBe("arrived");
+  });
+
+  it("faces the way it drives: left on a westbound route", () => {
+    const westbound = route({
+      geometry: {
+        type: "LineString",
+        coordinates: [
+          [-121, 46],
+          [-122, 47],
+        ],
+      },
+    });
+
+    expect(truckAt(westbound, 0.5).facing).toBe("left");
+    expect(truckAt(westbound, 5).facing).toBe("left");
+    expect(truckAt(route(), 0.5).facing).toBe("right");
+  });
+
+  it("follows a bend: right, then left after a U-turn", () => {
+    const bend = route({
+      geometry: {
+        type: "LineString",
+        coordinates: [
+          [-122, 47],
+          [-121, 47],
+          [-122, 46.9],
+        ],
+      },
+    });
+
+    expect(truckAt(bend, 0.5).facing).toBe("right");
+    expect(truckAt(bend, 1.75).facing).toBe("left");
+  });
+
+  it("keeps its direction through a short bend at the destination", () => {
+    const hook = route({
+      geometry: {
+        type: "LineString",
+        coordinates: [
+          [-121, 46],
+          [-122, 47],
+          [-121.99, 47],
+        ],
+      },
+    });
+
+    expect(truckAt(hook, 1.9).facing).toBe("left");
+    expect(truckAt(hook, 2).facing).toBe("left");
   });
 });
