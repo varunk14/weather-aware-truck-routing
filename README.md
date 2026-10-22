@@ -104,9 +104,11 @@ Both parts run on [Render](https://render.com)'s free plan, described in
 1. In the Render Dashboard choose **New > Blueprint** and pick this repository.
 2. Enter `TOMTOM_API_KEY` when asked. The Django secret key is generated, and each service gets
    the other's address (for the API's allowed origin and the web app's API address) from Render.
-3. To keep the free API awake, add a repository variable `API_HEALTH_URL` with the API's
-   health address (for example `https://clearway-api.onrender.com/api/health`); the
-   `keep-warm` workflow then calls it every 10 minutes.
+3. To keep the free API awake, point a free uptime monitor (for example UptimeRobot or
+   cron-job.org) at the API's health address (for example
+   `https://clearway-api.onrender.com/api/health`) every 5 minutes. As a backup, add a
+   repository variable `API_HEALTH_URL` with the same address and the `keep-warm` workflow
+   calls it too, though GitHub runs scheduled jobs late or skips them when busy.
 
 A free instance that has slept takes about a minute to wake; the web app says so meanwhile. On
 the very first deploy the API can fail once while the web app does not exist yet (its address is

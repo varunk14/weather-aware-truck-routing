@@ -89,9 +89,10 @@ scrubbing makes no requests and uploads nothing, and stays at 60 frames a second
 
 `render.yaml` describes both parts on Render's free plan: the web app as a static site and the
 API as a web service. Each learns the other's address from the platform at deploy time. A free
-API instance sleeps after 15 minutes without requests; a scheduled GitHub Actions job
-(`.github/workflows/keep-warm.yml`) calls `/api/health` every 10 minutes to keep it awake, and
-the web app says the API is starting up if a visitor arrives while it wakes.
+API instance sleeps after 15 minutes without requests; an external uptime monitor calls
+`/api/health` every 5 minutes to keep it awake, with a scheduled GitHub Actions job
+(`.github/workflows/keep-warm.yml`) as a backup, and the web app says the API is starting up if
+a visitor arrives while it wakes.
 
 ## Quality checks
 

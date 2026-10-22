@@ -1,9 +1,10 @@
 name: Keep the API warm
 
 # The free API instance sleeps after 15 minutes without requests and takes about a minute to
-# wake. Calling its health endpoint every 10 minutes keeps it awake for visitors. Set the
-# repository variable API_HEALTH_URL (for example https://clearway-api.onrender.com/api/health)
-# to turn this on; without it the job is skipped.
+# wake. An external uptime monitor calls its health endpoint every 5 minutes; this job is a
+# backup, since GitHub starts scheduled jobs on a best-effort basis. Set the repository variable
+# API_HEALTH_URL (for example https://clearway-api.onrender.com/api/health) to turn it on;
+# without it the job is skipped.
 
 on:
   schedule:

@@ -143,9 +143,10 @@ returned without a heatmap and the timeline says so.
 The web app is served as a static site and the API as a separate web service, both on Render's
 free plan (`render.yaml`). The web app calls the API directly, which allows only the web app's
 origin; a rewrite through the static site was not used, so a long plan never depends on a
-proxy's time limit. A free API instance sleeps after 15 minutes idle, so a scheduled GitHub
-Actions job calls the health endpoint every 10 minutes, which stays inside the free 750
-instance hours a month. The API runs as one Gunicorn process with threads, so every request
+proxy's time limit. A free API instance sleeps after 15 minutes idle, so an external uptime
+monitor calls the health endpoint every 5 minutes, which stays inside the free 750 instance
+hours a month. A scheduled GitHub Actions job does the same as a backup only: GitHub starts
+scheduled jobs on a best-effort basis, and in practice they ran hours apart. The API runs as one Gunicorn process with threads, so every request
 shares the in-memory cache.
 
 ### 26. Django 5.2 LTS without a database
