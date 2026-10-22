@@ -29,7 +29,9 @@ risk from wind, rain, snow and the load weight, and recommends the safest route.
 - **A weather heatmap** along the trip corridor, with a 0 to 48 hour slider (play, and Risk,
   Wind, Rain or Snow) and the truck's position at that hour. Every hour loads with the plan, so
   the slider never waits for the network.
-- **Phones:** the map fills the screen and the plan sits in a sheet that slides up.
+- **Phones:** the map fills the screen and the plan sits in a sheet that slides up; after
+  planning it lowers to a slim bar with the trip summary, so the routes have most of the
+  screen. On a computer the side panel can be hidden for a full-width map.
 
 | Condition    | Low    | Moderate    | High        | Severe      | No Travel |
 | ------------ | ------ | ----------- | ----------- | ----------- | --------- |

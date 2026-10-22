@@ -255,10 +255,12 @@ profile.
 ### 41. A bottom sheet on phones
 
 On phones the map fills the screen and the trip sits in a sheet over it, as in map apps. The sheet
-has three positions: a peek with the trip summary and the recommendation, half height with the
-route cards, and full height with everything, including the trip form. Its handle is a button
-(tap to cycle, arrow keys to step) and it can also be dragged. Picking a route or a checkpoint
-lowers the sheet so the map shows it. Wider screens keep the side panel.
+has four positions: a bar with only the trip summary and Edit, a peek that adds the
+recommendation, half height with the route cards, and full height with everything, including
+the trip form. Its handle is a button (tap to cycle, arrow keys to step) and it can also be
+dragged. A new plan opens at the bar, and picking a route or a checkpoint lowers the sheet to it,
+so the routes have most of the screen; the recommendation is one tap away. Wider screens keep
+the side panel, which a tab on the map's edge hides so the map has the whole width.
 
 ### 42. Everything on the map is also in the panel
 
@@ -285,7 +287,9 @@ uses its own picker, laid out like the browser's: a month calendar, with arrows 
 month, in which only the allowed days (now to ten days ahead) can be chosen, and a time typed or
 stepped like the browser's time input. The hour, minutes and AM or PM each take typed digits and
 the up and down arrows, with buttons above and below for a mouse or a finger. Any minute can be
-chosen. A time that has passed is marked and Done waits until it is fixed. The departure changes
+chosen. On a phone the hour and minutes open the number keypad; nothing in them is selected (so
+no cut and paste bar appears), and focus stays in the text fields so the keyboard does not close
+and reopen while the time is typed. A time that has passed is marked and Done waits until it is fixed. The departure changes
 only on Done; Cancel, Escape or a click outside leave it as it was.
 
 ### 46. The heatmap corridor
@@ -313,8 +317,8 @@ checkpoints' arrival times, so it moves at the pace TomTom expects, slower in tr
 slider always runs 48 hours, the forecast window the specification asks for, so a shorter trip
 arrives part way along it: a mark on the track and the text ("arrives at +24.5 h") say when.
 Playing runs the 48 hours in 12 seconds. On a phone the timeline floats above the lowered sheet
-and hides while the sheet is raised or a checkpoint's details are open, when it would cover most
-of the map; hiding it pauses playing and hides the heatmap, which is never shown without its
+(at the bar or the peek) and hides while the sheet is raised further or a checkpoint's details
+are open, when it would cover most of the map; hiding it pauses playing and hides the heatmap, which is never shown without its
 legend.
 
 ### 49. At most 120 heatmap cells
@@ -347,3 +351,12 @@ that name in Wisconsin. The resolved name is shown in the trip summary, so a sur
 Routes rank by average risk to three decimals. When the recommendation's reason compares two
 averages that are equal to two decimals (0.09 against 0.09), it shows the third (0.090 against
 0.094), so the sentence never reads as if the numbers were the same.
+
+### 52. The map keeps the routes framed until the user moves it
+
+The map frames the routes when a plan arrives or a route is picked. Until the user drags or
+zooms it, it frames them again whenever the space around them changes: the phone's sheet moves,
+the keyboard closes, the side panel is hidden or the window is resized. After that it stays where
+the user put it. The room kept for the sheet and the timeline is also shrunk when it would leave
+the routes less than a quarter of the map, since MapLibre frames nothing at all when the padding
+leaves no room, which on a short phone left the camera on its starting view.
